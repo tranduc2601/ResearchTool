@@ -68,4 +68,3 @@ __all__ = [
     # user profile
     "UserProfile",
 ]
-
