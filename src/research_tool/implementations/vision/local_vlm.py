@@ -56,7 +56,8 @@ class LocalVisionProvider(VisionProvider):
             )
 
         if "qwen" in self.model_name.lower():
-            self.model = AutoModelForCausalLM.from_pretrained(
+            from transformers import Qwen2VLForConditionalGeneration
+            self.model = Qwen2VLForConditionalGeneration.from_pretrained(
                 self.model_name,
                 trust_remote_code=True,
                 quantization_config=quant_config,
@@ -85,6 +86,7 @@ class LocalVisionProvider(VisionProvider):
         self._load_model()
         
         if "qwen" in self.model_name.lower():
+            from qwen_vl_utils import process_vision_info
             messages = [
                 {
                     "role": "user",
@@ -95,7 +97,15 @@ class LocalVisionProvider(VisionProvider):
                 }
             ]
             text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-            inputs = self.processor(text=[text], images=[image], padding=True, return_tensors="pt").to(self.device)
+            image_inputs, video_inputs = process_vision_info(messages)
+            
+            inputs = self.processor(
+                text=[text],
+                images=image_inputs,
+                videos=video_inputs,
+                padding=True,
+                return_tensors="pt"
+            ).to(self.device)
             
             generated_ids = self.model.generate(**inputs, max_new_tokens=256)
             generated_ids_trimmed = [

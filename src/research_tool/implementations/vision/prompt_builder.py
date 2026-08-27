@@ -13,7 +13,7 @@ class VisionPromptBuilder:
 
 CURRENT CONTEXT:
 Goal: "{goal}"
-Active App: {state.active_app or 'Unknown'}
+Active App: {state.app or 'Unknown'}
 Platform: {state.platform}
 
 YOUR TASK:
