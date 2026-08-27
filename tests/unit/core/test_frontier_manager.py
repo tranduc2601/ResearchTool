@@ -26,6 +26,24 @@ async def setup_db(tmp_path, run_id):
             """,
             (run_id, "test goal", "RUNNING", now, now)
         )
+        # insert fake seeds
+        for seed_id in ["test-seed-1", "seed-low", "seed-high", "test-status", "seed-1"]:
+            await conn.execute(
+                """
+                INSERT INTO seeds (seed_id, run_id, text, source, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (seed_id, run_id, f"test {seed_id}", "USER", "PENDING", now)
+            )
+        # insert fake entities
+        for entity_id in ["test-entity-1", "ent-1"]:
+            await conn.execute(
+                """
+                INSERT INTO entities (entity_id, run_id, canonical_name, entity_type, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (entity_id, run_id, f"test {entity_id}", "CONCEPT", now, now)
+            )
         await conn.commit()
         
     return db_file
@@ -46,7 +64,7 @@ async def test_add_seed(frontier_repo, run_id):
     assert item.entity_id is None
     assert item.status == FrontierStatus.PENDING
     assert item.priority_score > 0
-    assert item.score_components.mention_confidence == 0.8
+    assert item.score_components.mention_score == 0.8
     assert item.score_components.seed_similarity == 0.9
 
 @pytest.mark.asyncio
@@ -89,12 +107,12 @@ async def test_mark_completed_and_failed(frontier_repo, run_id):
     item = await manager.add_seed(seed_id="test-status")
     
     await manager.mark_completed(item.frontier_id)
-    db_item = await frontier_repo.get_by_id(item.frontier_id)
-    assert db_item.status == FrontierStatus.COMPLETED
+    db_item = await frontier_repo.get(item.frontier_id)
+    assert db_item.status == FrontierStatus.DONE
     
     await manager.mark_failed(item.frontier_id)
-    db_item = await frontier_repo.get_by_id(item.frontier_id)
-    assert db_item.status == FrontierStatus.FAILED
+    db_item = await frontier_repo.get(item.frontier_id)
+    assert db_item.status == FrontierStatus.SKIPPED
 
 @pytest.mark.asyncio
 async def test_count_pending(frontier_repo, run_id):
