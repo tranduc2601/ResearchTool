@@ -2,7 +2,7 @@
 
 import pytest
 
-from research_tool.domain import Confidence, PageType, WorldState
+from research_tool.domain import ActionCommand, ActionType, Confidence, PageType, WorldState
 from research_tool.interfaces import (
     BoundingBox,
     ComputerController,
@@ -81,13 +81,13 @@ def test_vision_result_minimal_and_full_instantiation():
         detected_elements=[element],
         current_entity_name="Product ABC",
         confidence=Confidence.KNOWN,
-        suggested_action="Scroll down to reviews",
+        next_action=ActionCommand(ActionType.SCROLL),
     )
     assert result.page_type == PageType.PRODUCT_PAGE
     assert len(result.detected_elements) == 1
     assert result.current_entity_name == "Product ABC"
     assert result.confidence == Confidence.KNOWN
-    assert result.suggested_action == "Scroll down to reviews"
+    assert result.next_action.action_type == ActionType.SCROLL
     assert result.raw_output is None
     assert result.screenshot_used is None
 
@@ -97,10 +97,11 @@ def test_vision_result_minimal_and_full_instantiation():
         detected_elements=[],
         current_entity_name=None,
         confidence=Confidence.UNCERTAIN,
-        suggested_action=None,
+        next_action=ActionCommand(ActionType.WAIT),
         raw_output={"model": "test-vlm", "tokens": 120},
         screenshot_used=b"fake-png-bytes",
     )
+    assert full_result.next_action.action_type == ActionType.WAIT
     assert full_result.raw_output == {"model": "test-vlm", "tokens": 120}
     assert full_result.screenshot_used == b"fake-png-bytes"
 
@@ -153,7 +154,7 @@ async def test_concrete_vision_provider_can_be_instantiated():
                 detected_elements=[],
                 current_entity_name=None,
                 confidence=Confidence.KNOWN,
-                suggested_action=None,
+                next_action=ActionCommand(ActionType.GOAL_MET),
             )
 
         async def locate_element(

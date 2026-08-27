@@ -9,6 +9,7 @@ from research_tool.domain.entity import (
     IdentityConfidence,
 )
 from research_tool.domain.event import ActionEvent, EventActor, EventType
+from research_tool.domain.action import ActionCommand, ActionResult, ActionStatus, ActionType
 from research_tool.domain.evidence import Evidence, EvidenceTheme, EvidenceType
 from research_tool.domain.frontier import FrontierItem, FrontierScore, FrontierStatus
 from research_tool.domain.graph import GraphEdge, GraphNode, NodeType, RelationType
@@ -65,6 +66,11 @@ __all__ = [
     "ActionEvent",
     "EventActor",
     "EventType",
+    # action
+    "ActionCommand",
+    "ActionResult",
+    "ActionStatus",
+    "ActionType",
     # user profile
     "UserProfile",
 ]

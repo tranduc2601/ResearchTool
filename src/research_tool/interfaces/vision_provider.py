@@ -12,7 +12,7 @@ Implementations live in research_tool.implementations.vision.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from research_tool.domain import Confidence, PageType, WorldState
+from research_tool.domain import Confidence, PageType, WorldState, ActionCommand
 
 
 @dataclass
@@ -41,7 +41,7 @@ class VisionResult:
     detected_elements: list[UIElement]
     current_entity_name: str | None
     confidence: Confidence
-    suggested_action: str | None  # natural-language suggestion
+    next_action: ActionCommand  # structured command
     raw_output: dict | None = None  # model's raw JSON output (for audit)
     screenshot_used: bytes | None = None
 

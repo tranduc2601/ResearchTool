@@ -22,6 +22,9 @@ from research_tool.infrastructure.db.repositories.run_repo import RunRepo
 
 logger = structlog.get_logger()
 
+class HumanInterventionRequired(Exception):
+    pass
+
 class Orchestrator:
     """Main control loop."""
 
@@ -90,6 +93,11 @@ class Orchestrator:
         try:
             await self._run_loop()
             self.current_run.status = RunStatus.DONE
+        except HumanInterventionRequired as e:
+            logger.warning("orchestrator_paused_for_human", reason=str(e))
+            self.current_run.status = RunStatus.PAUSED
+            await self.events.log(EventType.RUN_END, {"reason": "human_required"})
+            raise
         except asyncio.CancelledError:
             logger.info("orchestrator_cancelled")
             self.current_run.status = RunStatus.PAUSED
@@ -107,12 +115,12 @@ class Orchestrator:
                 await self.events.log(EventType.RUN_END)
 
     async def _run_loop(self) -> None:
-        """The core execution loop."""
-        max_iters = 5  # For V1, we put a hard limit for safety during tests
-        iters = 0
+        """The core outer exploration loop."""
+        max_goals = 5  # Limit for testing
+        goals_processed = 0
         
-        while iters < max_iters:
-            iters += 1
+        while goals_processed < max_goals:
+            goals_processed += 1
             
             # Check yield status
             if self.yield_tracker.current_status() == "SATURATION":
@@ -125,35 +133,94 @@ class Orchestrator:
                 logger.info("frontier_exhausted")
                 break
                 
-            # Get screen and state
+            # Execute inner loop to achieve goal
+            success = await self._achieve_goal(item)
+            
+            if success:
+                await self.frontier.mark_completed(item.frontier_id)
+            else:
+                await self.frontier.mark_failed(item.frontier_id)
+                
+            # Checkpoint periodically
+            if goals_processed % 3 == 0:
+                await self.recovery.create_checkpoint(
+                    world_state=self.world_state,
+                    trigger=CheckpointTrigger.PERIODIC
+                )
+                
+    async def _achieve_goal(self, frontier_item) -> bool:
+        """The inner SEE -> THINK -> ACT loop for a specific goal."""
+        from research_tool.domain.action import ActionType, ActionStatus
+        from research_tool.core.action_validator import ActionValidator
+        
+        max_actions = 10
+        actions_taken = 0
+        validator = ActionValidator(screen_width=1920, screen_height=1080)  # Standard bounds
+        
+        query = "Evaluate current screen."
+        if frontier_item.seed_id:
+            query = f"Search for seed: {frontier_item.seed_id}"
+            
+        while actions_taken < max_actions:
+            actions_taken += 1
+            
+            # 1. SEE
             screenshot_bytes = await self.controller.screenshot()
             self.world_state.active_url = await self.controller.get_active_url()
             self.world_state.active_window_title = await self.controller.get_window_title()
             
-            # Analyze
-            query = "Evaluate current screen for relevant products or evidence."
-            if item.seed_id:
-                query = f"Search for seed: {item.seed_id}" # In real app, we fetch seed text
-                
+            # 2. THINK
             vision_result = await self.vision.analyze_screen(screenshot_bytes, self.world_state, query)
-            
-            # (In a real implementation, we would now process vision_result.discovered_entities
-            # and add them to the frontier/evidence/graph)
-            
             await self.events.log(EventType.SCREENSHOT, {"page_type": vision_result.page_type.value})
             
-            # Record a generic visit for tracking
+            # Record visit based on visual context
             await self.visits.record_visit(
                 platform="unknown",
                 url=self.world_state.active_url,
                 screen_fingerprint="dummy_fp"
             )
             
-            # Checkpoint
-            if iters % 3 == 0:
-                await self.recovery.create_checkpoint(
-                    world_state=self.world_state,
-                    trigger=CheckpointTrigger.PERIODIC
-                )
+            action = vision_result.next_action
+            
+            # 3. VALIDATE
+            validation_result = validator.validate(action)
+            if validation_result.status != ActionStatus.SUCCESS:
+                logger.warning("invalid_action_proposed", action=action.action_type, error=validation_result.error)
+                # In real scenario: feed error back to VLM in next iter
+                continue
                 
-            await self.frontier.mark_completed(item.frontier_id)
+            # 4. EVALUATE TERMINAL STATES
+            if action.action_type == ActionType.GOAL_MET:
+                logger.info("goal_met", frontier_item=frontier_item.frontier_id)
+                return True
+            elif action.action_type == ActionType.GOAL_FAILED:
+                logger.warning("goal_failed_by_vision", frontier_item=frontier_item.frontier_id)
+                return False
+            elif action.action_type == ActionType.HUMAN_REQUIRED:
+                logger.warning("human_intervention_required")
+                self.current_run.status = RunStatus.PAUSED
+                raise HumanInterventionRequired("Human required")
+                
+            # 5. ACT
+            logger.info("executing_action", type=action.action_type)
+            result = None
+            if action.action_type == ActionType.CLICK and action.x is not None and action.y is not None:
+                result = await self.controller.click(action.x, action.y)
+            elif action.action_type == ActionType.TYPE_TEXT and action.text:
+                result = await self.controller.type_text(action.text)
+            elif action.action_type == ActionType.SCROLL and action.x is not None and action.y is not None:
+                result = await self.controller.scroll(action.x, action.y, dy=10) # Stub dy
+            elif action.action_type == ActionType.PRESS_KEY and action.key:
+                result = await self.controller.press_key(action.key)
+            elif action.action_type == ActionType.BACK:
+                result = await self.controller.back()
+            elif action.action_type == ActionType.WAIT:
+                await asyncio.sleep(1.0)
+                continue
+            
+            if result and result.status == ActionStatus.FAILURE:
+                logger.warning("action_failed", type=action.action_type, error=result.error)
+                # In real scenario: backoff or feed error to VLM
+                
+        logger.warning("inner_loop_timeout", max_actions=max_actions)
+        return False

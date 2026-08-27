@@ -60,7 +60,7 @@ async def test_stub_vision_provider_analyze_screen_defaults():
     assert result.confidence == Confidence.KNOWN
     assert result.detected_elements == []
     assert result.current_entity_name is None
-    assert result.suggested_action is None
+    assert result.next_action.action_type == "GOAL_MET"
     assert result.raw_output == {"stub": True}
 
 

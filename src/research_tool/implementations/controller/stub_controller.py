@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import structlog
-
+from research_tool.domain import ActionResult, ActionStatus
 from research_tool.interfaces import ComputerController
 
 logger = structlog.get_logger()
@@ -49,26 +49,33 @@ class StubController(ComputerController):
         self._record("screenshot")
         return self._stub_png
 
-    async def move(self, x: int, y: int, smooth: bool = True) -> None:
+    async def move(self, x: int, y: int, smooth: bool = True) -> ActionResult:
         self._record("move", x=x, y=y, smooth=smooth)
+        return ActionResult(ActionStatus.SUCCESS)
 
-    async def click(self, x: int, y: int, button: str = "left") -> None:
+    async def click(self, x: int, y: int, button: str = "left") -> ActionResult:
         self._record("click", x=x, y=y, button=button)
+        return ActionResult(ActionStatus.SUCCESS)
 
-    async def double_click(self, x: int, y: int) -> None:
+    async def double_click(self, x: int, y: int) -> ActionResult:
         self._record("double_click", x=x, y=y)
+        return ActionResult(ActionStatus.SUCCESS)
 
-    async def scroll(self, x: int, y: int, dy: int) -> None:
+    async def scroll(self, x: int, y: int, dy: int) -> ActionResult:
         self._record("scroll", x=x, y=y, dy=dy)
+        return ActionResult(ActionStatus.SUCCESS)
 
-    async def type_text(self, text: str, clear_first: bool = False) -> None:
+    async def type_text(self, text: str, clear_first: bool = False) -> ActionResult:
         self._record("type_text", text=text, clear_first=clear_first)
+        return ActionResult(ActionStatus.SUCCESS)
 
-    async def press_key(self, key: str) -> None:
+    async def press_key(self, key: str) -> ActionResult:
         self._record("press_key", key=key)
+        return ActionResult(ActionStatus.SUCCESS)
 
-    async def back(self) -> None:
+    async def back(self) -> ActionResult:
         self._record("back")
+        return ActionResult(ActionStatus.SUCCESS)
 
     async def get_window_title(self) -> str:
         self._record("get_window_title")

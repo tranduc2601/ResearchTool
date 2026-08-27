@@ -1,6 +1,7 @@
 """Abstract interfaces that decouple core logic from implementations."""
 
 from research_tool.interfaces.computer_controller import ComputerController
+from research_tool.interfaces.coordinate_mapper import CoordinateMapper
 from research_tool.interfaces.ocr_provider import OCRProvider, OCRResult, OCRWord
 from research_tool.interfaces.platform_adapter import PlatformAdapter
 from research_tool.interfaces.vision_provider import (
@@ -22,4 +23,5 @@ __all__ = [
     "OCRProvider",
     "ComputerController",
     "PlatformAdapter",
+    "CoordinateMapper",
 ]

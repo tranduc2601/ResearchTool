@@ -14,7 +14,9 @@ from research_tool.infrastructure.db.repositories import (
     EvidenceRepo, EntityRepo, CheckpointRepo, EventRepo
 )
 from research_tool.infrastructure.file_storage import FileStorage
-from research_tool.domain import PageType, Confidence, RunStatus
+from research_tool.domain import PageType, Confidence, RunStatus, ActionCommand, ActionType
+
+# ... (skipping some lines, actually let's just do a direct replacement of suggested_action)
 from research_tool.domain.event import EventType
 from research_tool.interfaces import VisionResult, UIElement, BoundingBox
 from research_tool.core.event_logger import EventLogger
@@ -68,8 +70,8 @@ async def test_full_autonomous_lifecycle(tmp_path: Path):
         ],
         current_entity_name="Test Ergonomic Chair",
         confidence=Confidence.KNOWN,
-        suggested_action="Click on the product card",
-        raw_output="{}"
+        next_action=ActionCommand(action_type=ActionType.GOAL_MET),
+        raw_output={}
     )
     
     ocr = AsyncMock()

@@ -11,6 +11,7 @@ The core uses this interface exclusively, never a concrete controller.
 """
 
 from abc import ABC, abstractmethod
+from research_tool.domain import ActionResult
 
 
 class ComputerController(ABC):
@@ -20,37 +21,37 @@ class ComputerController(ABC):
         ...
 
     @abstractmethod
-    async def move(self, x: int, y: int, smooth: bool = True) -> None:
+    async def move(self, x: int, y: int, smooth: bool = True) -> ActionResult:
         """Move the mouse/pointer to (x, y)."""
         ...
 
     @abstractmethod
-    async def click(self, x: int, y: int, button: str = "left") -> None:
+    async def click(self, x: int, y: int, button: str = "left") -> ActionResult:
         """Click at (x, y). button: 'left' | 'right' | 'middle'."""
         ...
 
     @abstractmethod
-    async def double_click(self, x: int, y: int) -> None:
+    async def double_click(self, x: int, y: int) -> ActionResult:
         """Double-click at (x, y)."""
         ...
 
     @abstractmethod
-    async def scroll(self, x: int, y: int, dy: int) -> None:
+    async def scroll(self, x: int, y: int, dy: int) -> ActionResult:
         """Scroll at (x, y) by dy clicks (positive = down, negative = up)."""
         ...
 
     @abstractmethod
-    async def type_text(self, text: str, clear_first: bool = False) -> None:
+    async def type_text(self, text: str, clear_first: bool = False) -> ActionResult:
         """Type text at the current focus position."""
         ...
 
     @abstractmethod
-    async def press_key(self, key: str) -> None:
+    async def press_key(self, key: str) -> ActionResult:
         """Press a key by name (e.g. 'enter', 'escape', 'ctrl+a')."""
         ...
 
     @abstractmethod
-    async def back(self) -> None:
+    async def back(self) -> ActionResult:
         """Navigate back (browser back or Android back gesture)."""
         ...
 

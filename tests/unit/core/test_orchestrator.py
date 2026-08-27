@@ -55,8 +55,10 @@ async def test_orchestrator_start_session():
     controller.get_active_url.return_value = "https://example.com"
     controller.get_window_title.return_value = "Example Title"
     
+    from research_tool.domain import ActionCommand, ActionType
     vision_result = MagicMock()
     vision_result.page_type = PageType.SEARCH_RESULT
+    vision_result.next_action = ActionCommand(ActionType.GOAL_MET)
     vision_provider.analyze_screen.return_value = vision_result
 
     # Create orchestrator
