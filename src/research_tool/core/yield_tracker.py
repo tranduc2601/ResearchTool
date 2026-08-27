@@ -24,7 +24,6 @@ class YieldWindow:
     new_seeds: int = 0
     duplicate_count: int = 0
 
-    @property
     def is_low_yield(self, threshold: int = 2) -> bool:
         return self.new_candidates < threshold
 

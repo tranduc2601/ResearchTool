@@ -1,6 +1,5 @@
 """Provenance chain helpers — pure functions, no I/O."""
 
-from research_tool.domain import Seed, Evidence, Entity
 
 def build_seed_provenance(
     run_id: str,

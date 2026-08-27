@@ -2,11 +2,9 @@
 
 import structlog
 from datetime import datetime, timezone
-from pathlib import Path
 from research_tool.domain import ActionEvent, EventType, EventActor
 from research_tool.infrastructure.db.repositories.event_repo import EventRepo
 from research_tool.infrastructure.file_storage import FileStorage
-from research_tool.infrastructure.serialization import to_json
 import ulid
 
 logger = structlog.get_logger()
