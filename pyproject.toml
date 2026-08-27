@@ -34,6 +34,10 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.4",
     "mypy>=1.10",
+    "psutil>=5.9",
+    "pynvml>=11.5",
+    "paddlepaddle>=2.6",
+    "paddleocr>=2.7",
 ]
 
 [project.scripts]
