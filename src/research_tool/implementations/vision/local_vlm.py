@@ -132,11 +132,11 @@ class LocalVisionProvider(VisionProvider):
         
         # If we have OCR enabled, we can optionally overlay text or append OCR context to the prompt
         ocr_text = ""
-        if self.ocr_provider and self.ocr_provider.enabled:
+        if self.ocr_provider:
             # We don't want to block, so wait on it
-            ocr_entities = await self.ocr_provider.extract_text(screenshot)
-            if ocr_entities:
-                ocr_text = "\nDetected Text via OCR:\n" + ", ".join([e.text for e in ocr_entities[:20]])
+            ocr_result = await self.ocr_provider.extract_text(screenshot)
+            if ocr_result and ocr_result.words:
+                ocr_text = "\nDetected Text via OCR:\n" + ", ".join([w.text for w in ocr_result.words[:20]])
         
         prompt = VisionPromptBuilder.build_analysis_prompt(context, query)
         prompt += ocr_text

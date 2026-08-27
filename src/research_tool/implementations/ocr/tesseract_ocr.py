@@ -1,7 +1,8 @@
 """Tesseract-based CPU OCR implementation."""
 import structlog
 from typing import Optional
-from research_tool.interfaces.ocr_provider import OCRProvider, OCREntity
+from research_tool.interfaces.ocr_provider import OCRProvider, OCRResult, OCRWord
+from research_tool.interfaces.vision_provider import BoundingBox
 
 logger = structlog.get_logger()
 
@@ -28,26 +29,27 @@ class TesseractOCRProvider(OCRProvider):
         if not self.enabled:
             logger.warning("tesseract_not_installed", message="pip install pytesseract pillow, and install tesseract-ocr system binary")
 
-    async def extract_text(self, screenshot_bytes: bytes) -> list[OCREntity]:
+    async def extract_text(self, image: bytes, region: BoundingBox | None = None, language_hint: str = "vi") -> OCRResult:
         """Extracts text and bounding boxes from a screenshot."""
         if not self.enabled:
-            return []
+            return OCRResult(full_text="", words=[])
             
         try:
-            # We must run this in a thread because pytesseract is blocking and CPU heavy
             import asyncio
-            return await asyncio.to_thread(self._run_tesseract, screenshot_bytes)
+            return await asyncio.to_thread(self._run_tesseract, image, region, language_hint)
         except Exception as e:
             logger.exception("ocr_failed", error=str(e))
-            return []
+            return OCRResult(full_text="", words=[])
             
-    def _run_tesseract(self, screenshot_bytes: bytes) -> list[OCREntity]:
+    def _run_tesseract(self, screenshot_bytes: bytes, region: BoundingBox | None, lang: str) -> OCRResult:
         image = Image.open(io.BytesIO(screenshot_bytes)).convert("RGB")
+        if region:
+            image = image.crop((region.x, region.y, region.x + region.width, region.y + region.height))
         
-        # Use Output.DICT to get bounding boxes
-        data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
+        data = pytesseract.image_to_data(image, lang=lang, output_type=pytesseract.Output.DICT)
+        full_text = pytesseract.image_to_string(image, lang=lang)
         
-        entities = []
+        words = []
         n_boxes = len(data['level'])
         for i in range(n_boxes):
             text = data['text'][i].strip()
@@ -56,8 +58,8 @@ class TesseractOCRProvider(OCRProvider):
                 y = data['top'][i]
                 w = data['width'][i]
                 h = data['height'][i]
-                # Filter out very small boxes or artifacts
                 if len(text) > 2 or text.isalnum():
-                    entities.append(OCREntity(text=text, x=x, y=y, width=w, height=h))
+                    bbox = BoundingBox(x=x, y=y, width=w, height=h)
+                    words.append(OCRWord(text=text, bounding_box=bbox))
                     
-        return entities
+        return OCRResult(full_text=full_text, words=words, language=lang)
