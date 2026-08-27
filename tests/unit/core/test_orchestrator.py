@@ -145,5 +145,5 @@ async def test_orchestrator_cancellation():
         await orchestrator.start_session("test query", "run-1")
         
     # Ensure completion log/status still happens
-    assert orchestrator.current_run.status.name == "DONE"
+    assert orchestrator.current_run.status.name == "PAUSED"
     run_repo.update_status.assert_awaited_once_with("run-1", orchestrator.current_run.status)

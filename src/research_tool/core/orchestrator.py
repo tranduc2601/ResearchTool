@@ -1,13 +1,11 @@
 """Central orchestrator for the autonomous visual agent."""
 import structlog
 import asyncio
-from typing import Any
 from datetime import datetime, timezone
-import ulid
 
 from research_tool.domain import (
-    RunSession, SeedSource, EventType, ActionEvent,
-    WorldState, PageType, AgentStatus, CheckpointTrigger,
+    RunSession, SeedSource, EventType,
+    WorldState, PageType, CheckpointTrigger,
     RunStatus
 )
 from research_tool.interfaces import ComputerController, VisionProvider, OCRProvider
@@ -92,19 +90,22 @@ class Orchestrator:
         # Start the loop
         try:
             await self._run_loop()
+            self.current_run.status = RunStatus.DONE
         except asyncio.CancelledError:
             logger.info("orchestrator_cancelled")
+            self.current_run.status = RunStatus.PAUSED
             await self.events.log(EventType.RUN_END, {"reason": "cancelled"})
             raise
         except Exception as e:
             logger.exception("orchestrator_crashed", error=str(e))
+            self.current_run.status = RunStatus.FAILED
             await self.events.log(EventType.RUN_END, {"error": str(e)})
             raise
         finally:
             self.current_run.time_end = datetime.now(timezone.utc)
-            self.current_run.status = RunStatus.DONE
-            await self.run_repo.update_status(run_id, RunStatus.DONE)
-            await self.events.log(EventType.RUN_END)
+            await self.run_repo.update_status(run_id, self.current_run.status)
+            if self.current_run.status == RunStatus.DONE:
+                await self.events.log(EventType.RUN_END)
 
     async def _run_loop(self) -> None:
         """The core execution loop."""
