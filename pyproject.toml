@@ -25,6 +25,7 @@ dependencies = [
     "pyautogui>=0.9.54",
     "mss>=9.0",
     "pygetwindow>=0.0.9",
+    "Levenshtein>=0.25",
 ]
 
 [project.optional-dependencies]

@@ -11,9 +11,12 @@ from research_tool.infrastructure.db.repositories import (
     EvidenceRepo, EntityRepo, CheckpointRepo, EventRepo
 )
 from research_tool.infrastructure.file_storage import FileStorage
-from research_tool.implementations import (
-    StubVisionProvider, StubOCRProvider, StubController
-)
+from research_tool.implementations.vision.local_vlm import LocalVisionProvider
+from research_tool.implementations.ocr.tesseract_ocr import TesseractOCRProvider
+from research_tool.implementations.controller.windows_controller import WindowsController
+from research_tool.implementations.controller.android_controller import AndroidController
+from research_tool.core.scaling_mapper import ScalingCoordinateMapper
+
 from research_tool.core.event_logger import EventLogger
 from research_tool.core.yield_tracker import YieldTracker
 from research_tool.core.seed_manager import SeedManager
@@ -22,7 +25,9 @@ from research_tool.core.frontier_manager import FrontierManager
 from research_tool.core.exploration_graph import ExplorationGraph
 from research_tool.core.evidence_manager import EvidenceManager
 from research_tool.core.recovery_manager import RecoveryManager
+from research_tool.core.entity_manager import EntityManager
 from research_tool.core.orchestrator import Orchestrator
+from research_tool.cli.dashboard import Dashboard
 
 app = typer.Typer(help="Autonomous Visual Information Explorer")
 console = Console()
@@ -30,13 +35,16 @@ console = Console()
 @app.command()
 def run(
     query: str = typer.Argument(..., help="The initial search query or goal"),
-    config: Path = typer.Option(None, help="Path to custom config yaml")
+    config: Path = typer.Option(None, help="Path to custom config yaml"),
+    model: str = typer.Option("qwen2-vl", help="Local VLM model name"),
+    platform: str = typer.Option("windows", help="Target platform (windows or android)"),
+    resume: str = typer.Option(None, help="Run ID to resume"),
 ):
     """Start an autonomous research session."""
     console.print(f"[bold green]Starting session with query:[/bold green] {query}")
-    asyncio.run(_async_run(query, config))
+    asyncio.run(_async_run(query, config, model, platform, resume))
 
-async def _async_run(query: str, config: Path | None):
+async def _async_run(query: str, config: Path | None, model: str, platform: str, resume: str | None):
     settings = load_settings(config)
     
     # Initialize DB
@@ -58,13 +66,19 @@ async def _async_run(query: str, config: Path | None):
     # Infrastructure
     file_storage = FileStorage(settings.data_dir)
     
-    # Providers (using stubs for V1)
-    vision = StubVisionProvider()
-    ocr = StubOCRProvider()
-    controller = StubController()
+    # Providers
+    ocr = TesseractOCRProvider()
+    vision = LocalVisionProvider(model_name=model, ocr_provider=ocr)
+    
+    if platform.lower() == "android":
+        mapper = ScalingCoordinateMapper(1000, 1000, 1080, 2400)
+        controller = AndroidController(mapper=mapper)
+    else:
+        mapper = ScalingCoordinateMapper(1000, 1000, 1920, 1080)
+        controller = WindowsController(mapper=mapper)
     
     import ulid
-    run_id = ulid.new().str
+    run_id = resume if resume else ulid.new().str
     
     # Core Managers
     events = EventLogger(run_id, event_repo, file_storage)
@@ -73,6 +87,7 @@ async def _async_run(query: str, config: Path | None):
     visits = VisitManager(run_id, visit_repo)
     frontier = FrontierManager(run_id, frontier_repo)
     graph = ExplorationGraph(run_id, graph_repo)
+    entities = EntityManager(run_id, entity_repo, frontier, yield_tracker)
     evidence = EvidenceManager(run_id, evidence_repo, entity_repo, file_storage, yield_tracker)
     recovery = RecoveryManager(run_id, checkpoint_repo, yield_tracker)
     
@@ -90,9 +105,20 @@ async def _async_run(query: str, config: Path | None):
         exploration_graph=graph,
         evidence_manager=evidence,
         recovery_manager=recovery,
+        entity_manager=entities
     )
     
-    await orchestrator.start_session(query, run_id=run_id)
+    dashboard = Dashboard(orchestrator)
+    
+    # Run orchestration and dashboard concurrently
+    if resume:
+        orch_task = asyncio.create_task(orchestrator.resume_session(resume))
+    else:
+        orch_task = asyncio.create_task(orchestrator.start_session(query, run_id=run_id))
+        
+    dash_task = asyncio.create_task(dashboard.run())
+    
+    await asyncio.gather(orch_task, dash_task)
     console.print("[bold green]Session completed![/bold green]")
 
 if __name__ == "__main__":

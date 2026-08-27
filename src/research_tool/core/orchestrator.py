@@ -17,6 +17,7 @@ from research_tool.core.visit_manager import VisitManager
 from research_tool.core.frontier_manager import FrontierManager
 from research_tool.core.exploration_graph import ExplorationGraph
 from research_tool.core.evidence_manager import EvidenceManager
+from research_tool.core.entity_manager import EntityManager
 from research_tool.core.recovery_manager import RecoveryManager
 from research_tool.infrastructure.db.repositories.run_repo import RunRepo
 
@@ -43,6 +44,7 @@ class Orchestrator:
         exploration_graph: ExplorationGraph,
         evidence_manager: EvidenceManager,
         recovery_manager: RecoveryManager,
+        entity_manager: EntityManager,
     ):
         self.settings = settings
         self.run_repo = run_repo
@@ -57,6 +59,7 @@ class Orchestrator:
         self.graph = exploration_graph
         self.evidence = evidence_manager
         self.recovery = recovery_manager
+        self.entities = entity_manager
 
         self.current_run: RunSession | None = None
         self.world_state: WorldState | None = None
@@ -114,6 +117,40 @@ class Orchestrator:
             if self.current_run.status == RunStatus.DONE:
                 await self.events.log(EventType.RUN_END)
 
+    async def resume_session(self, run_id: str) -> None:
+        """Resume a previously paused or crashed session."""
+        self.current_run = await self.run_repo.get(run_id)
+        if not self.current_run:
+            raise ValueError(f"Run {run_id} not found.")
+            
+        self.world_state = await self.recovery.load_checkpoint()
+        if not self.world_state:
+            # Fallback to default state if no checkpoint
+            self.world_state = WorldState(run_id=run_id, platform="windows", app="browser")
+            
+        self.current_run.status = RunStatus.RUNNING
+        await self.run_repo.update_status(run_id, RunStatus.RUNNING)
+        await self.events.log(EventType.RUN_START, {"reason": "resumed"})
+        
+        try:
+            await self._run_loop()
+            self.current_run.status = RunStatus.DONE
+        except HumanInterventionRequired as e:
+            logger.warning("orchestrator_paused_for_human", reason=str(e))
+            self.current_run.status = RunStatus.PAUSED
+            await self.events.log(EventType.RUN_END, {"reason": "human_required"})
+            raise
+        except Exception as e:
+            logger.exception("orchestrator_crashed", error=str(e))
+            self.current_run.status = RunStatus.FAILED
+            await self.events.log(EventType.RUN_END, {"error": str(e)})
+            raise
+        finally:
+            self.current_run.time_end = datetime.now(timezone.utc)
+            await self.run_repo.update_status(run_id, self.current_run.status)
+            if self.current_run.status == RunStatus.DONE:
+                await self.events.log(EventType.RUN_END)
+
     async def _run_loop(self) -> None:
         """The core outer exploration loop."""
         max_goals = 5  # Limit for testing
@@ -152,10 +189,12 @@ class Orchestrator:
         """The inner SEE -> THINK -> ACT loop for a specific goal."""
         from research_tool.domain.action import ActionType, ActionStatus
         from research_tool.core.action_validator import ActionValidator
+        from research_tool.domain.evidence import EvidenceType
         
-        max_actions = 10
+        max_actions = 15
         actions_taken = 0
-        validator = ActionValidator(screen_width=1920, screen_height=1080)  # Standard bounds
+        consecutive_scrolls = 0
+        validator = ActionValidator(screen_width=1920, screen_height=1080)
         
         query = "Evaluate current screen."
         if frontier_item.seed_id:
@@ -173,6 +212,36 @@ class Orchestrator:
             vision_result = await self.vision.analyze_screen(screenshot_bytes, self.world_state, query)
             await self.events.log(EventType.SCREENSHOT, {"page_type": vision_result.page_type.value})
             
+            # Parse extracted entities/evidence
+            if vision_result.raw_output:
+                for ent_dict in vision_result.raw_output.get("extracted_entities", []):
+                    if ent_dict.get("name"):
+                        await self.entities.discover_entity(
+                            name=ent_dict["name"],
+                            brand=ent_dict.get("brand"),
+                            model_sku=ent_dict.get("model_sku")
+                        )
+                        # Reset scroll counter since we found something new
+                        consecutive_scrolls = 0
+                
+                for ev_dict in vision_result.raw_output.get("extracted_evidence", []):
+                    if ev_dict.get("raw_text"):
+                        ev_type = EvidenceType.FEATURE
+                        try:
+                            ev_type = EvidenceType[ev_dict.get("evidence_type", "FEATURE").upper()]
+                        except KeyError:
+                            pass
+                        await self.evidence.add_evidence(
+                            entity_id=frontier_item.entity_id,
+                            evidence_type=ev_type,
+                            raw_text=ev_dict["raw_text"],
+                            source_platform=self.world_state.platform,
+                            source_url=self.world_state.active_url,
+                            root_seed_id=frontier_item.seed_id or "root", # Hack for PoC
+                            screenshot_bytes=screenshot_bytes
+                        )
+                        consecutive_scrolls = 0
+            
             # Record visit based on visual context
             await self.visits.record_visit(
                 platform="unknown",
@@ -182,11 +251,20 @@ class Orchestrator:
             
             action = vision_result.next_action
             
+            # Page Reading heuristic: Stop after 3 consecutive scrolls without new info
+            if action.action_type == ActionType.SCROLL:
+                consecutive_scrolls += 1
+                if consecutive_scrolls >= 3:
+                    logger.info("page_reading_limit_reached", consecutive_scrolls=consecutive_scrolls)
+                    action.action_type = ActionType.GOAL_MET
+            else:
+                if action.action_type != ActionType.WAIT:
+                    consecutive_scrolls = 0
+            
             # 3. VALIDATE
             validation_result = validator.validate(action)
             if validation_result.status != ActionStatus.SUCCESS:
                 logger.warning("invalid_action_proposed", action=action.action_type, error=validation_result.error)
-                # In real scenario: feed error back to VLM in next iter
                 continue
                 
             # 4. EVALUATE TERMINAL STATES
@@ -199,6 +277,7 @@ class Orchestrator:
             elif action.action_type == ActionType.HUMAN_REQUIRED:
                 logger.warning("human_intervention_required")
                 self.current_run.status = RunStatus.PAUSED
+                from research_tool.core.orchestrator import HumanInterventionRequired
                 raise HumanInterventionRequired("Human required")
                 
             # 5. ACT
@@ -209,9 +288,9 @@ class Orchestrator:
             elif action.action_type == ActionType.TYPE_TEXT and action.text:
                 result = await self.controller.type_text(action.text)
             elif action.action_type == ActionType.SCROLL and action.x is not None and action.y is not None:
-                result = await self.controller.scroll(action.x, action.y, dy=10) # Stub dy
-            elif action.action_type == ActionType.PRESS_KEY and action.key:
-                result = await self.controller.press_key(action.key)
+                result = await self.controller.scroll(action.x, action.y, dy=action.dy or -1)
+            elif action.action_type == ActionType.PRESS_KEY and action.text:
+                result = await self.controller.press_key(action.text)
             elif action.action_type == ActionType.BACK:
                 result = await self.controller.back()
             elif action.action_type == ActionType.WAIT:
@@ -220,7 +299,6 @@ class Orchestrator:
             
             if result and result.status == ActionStatus.FAILURE:
                 logger.warning("action_failed", type=action.action_type, error=result.error)
-                # In real scenario: backoff or feed error to VLM
                 
         logger.warning("inner_loop_timeout", max_actions=max_actions)
         return False
