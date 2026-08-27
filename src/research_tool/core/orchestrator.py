@@ -72,7 +72,6 @@ class Orchestrator:
         
         # Inject the first seed
         seed, _ = await self.seeds.create_seed(
-            run_id=run_id,
             text=initial_query,
             source=SeedSource.USER
         )

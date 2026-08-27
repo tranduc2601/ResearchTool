@@ -91,7 +91,7 @@ async def test_orchestrator_start_session():
     event_logger.log.assert_any_await(EventType.RUN_START, {"initial_query": "test query"})
     
     # 3. verify seed creation
-    seed_manager.create_seed.assert_awaited_once_with(run_id="run-1", text="test query", source=SeedSource.USER)
+    seed_manager.create_seed.assert_awaited_once_with(text="test query", source=SeedSource.USER)
     frontier_manager.add_seed.assert_awaited_once()
     
     # 4. verify loop calls (2 items before exhausted)
