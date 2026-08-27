@@ -99,19 +99,19 @@ async def test_get_latest_checkpoint_returns_most_recent(
     # Save a first one
     cp1 = await recovery_manager.create_checkpoint(
         world_state=dummy_world_state,
-        trigger=CheckpointTrigger.TIME_BASED
+        trigger=CheckpointTrigger.SEARCH_DONE
     )
     
     # Save a second one later
     cp2 = await recovery_manager.create_checkpoint(
         world_state=dummy_world_state,
-        trigger=CheckpointTrigger.MANUAL
+        trigger=CheckpointTrigger.PRODUCT_OPENED
     )
     
     loaded = await recovery_manager.get_latest_checkpoint()
     assert loaded is not None
     assert loaded.checkpoint_id == cp2.checkpoint_id
-    assert loaded.trigger == CheckpointTrigger.MANUAL
+    assert loaded.trigger == CheckpointTrigger.PRODUCT_OPENED
 
 
 @pytest.mark.asyncio
