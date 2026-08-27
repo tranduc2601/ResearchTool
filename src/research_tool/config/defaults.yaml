@@ -1,0 +1,13 @@
+data_dir: "data"
+
+orchestrator:
+  max_revisits: 3
+  action_timeout_seconds: 15.0
+  yield_window_minutes: 20
+  low_yield_threshold: 2
+  saturation_evidence_threshold: 5
+
+providers:
+  vision_backend: "stub"
+  ocr_backend: "stub"
+  controller_backend: "stub"
