@@ -121,5 +121,50 @@ async def _async_run(query: str, config: Path | None, model: str, platform: str,
     await asyncio.gather(orch_task, dash_task)
     console.print("[bold green]Session completed![/bold green]")
 
+@app.command()
+def export(
+    run_id: str = typer.Argument(..., help="The Run ID to export"),
+    format: str = typer.Option("json", help="Export format: json or csv"),
+    out: Path = typer.Option(Path("export_out"), help="Output directory"),
+    config: Path = typer.Option(None, help="Path to custom config yaml")
+):
+    """Export run data (entities, evidence, graphs) to a structured format."""
+    settings = load_settings(config)
+    db_path = settings.data_dir / "research.db"
+    
+    if not db_path.exists():
+        console.print(f"[red]Database not found at {db_path}[/red]")
+        raise typer.Exit(1)
+        
+    out.mkdir(parents=True, exist_ok=True)
+    
+    # Simple synchronous dump for export
+    import sqlite3
+    import json
+    import csv
+    
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    
+    tables = ["entities", "evidence", "visits", "frontier"]
+    
+    for table in tables:
+        rows = conn.execute(f"SELECT * FROM {table} WHERE run_id = ?", (run_id,)).fetchall()
+        data = [dict(r) for r in rows]
+        
+        if format.lower() == "json":
+            out_file = out / f"{run_id}_{table}.json"
+            with open(out_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        else:
+            out_file = out / f"{run_id}_{table}.csv"
+            if data:
+                with open(out_file, "w", newline="", encoding="utf-8") as f:
+                    writer = csv.DictWriter(f, fieldnames=data[0].keys())
+                    writer.writeheader()
+                    writer.writerows(data)
+                    
+    console.print(f"[bold green]Exported {len(tables)} tables to {out.absolute()}[/bold green]")
+
 if __name__ == "__main__":
     app()

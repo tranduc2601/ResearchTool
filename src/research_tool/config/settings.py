@@ -10,11 +10,30 @@ class OrchestratorSettings(BaseModel):
     yield_window_minutes: int = 20
     low_yield_threshold: int = 2
     saturation_evidence_threshold: int = 5
+    max_consecutive_scrolls: int = 3
+    checkpoint_interval_actions: int = 10
 
 class ProviderSettings(BaseModel):
-    vision_backend: str = "stub"
-    ocr_backend: str = "stub"
-    controller_backend: str = "stub"
+    vision_backend: str = "qwen2-vl"
+    vision_model_path: str = "Qwen/Qwen2-VL-2B-Instruct"
+    ocr_backend: str = "tesseract"
+    tesseract_cmd: str | None = None
+    controller_backend: str = "windows"
+    hf_token: str | None = None
+    openai_api_key: str | None = None
+
+class AndroidSettings(BaseModel):
+    device_serial: str | None = None
+    use_scrcpy: bool = False
+    scrcpy_path: str = "scrcpy"
+    scrcpy_max_fps: int = 5
+    scrcpy_bitrate: str = "2M"
+    adb_path: str = "adb"
+
+class DedupSettings(BaseModel):
+    levenshtein_same_threshold: float = 0.95
+    levenshtein_prob_same_threshold: float = 0.80
+    image_hash_distance_threshold: int = 5
 
 class AppSettings(BaseSettings):
     """
@@ -31,6 +50,8 @@ class AppSettings(BaseSettings):
     data_dir: Path = Path("data")
     orchestrator: OrchestratorSettings = OrchestratorSettings()
     providers: ProviderSettings = ProviderSettings()
+    android: AndroidSettings = AndroidSettings()
+    dedup: DedupSettings = DedupSettings()
 
     @classmethod
     def settings_customise_sources(

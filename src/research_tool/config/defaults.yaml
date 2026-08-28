@@ -6,8 +6,27 @@ orchestrator:
   yield_window_minutes: 20
   low_yield_threshold: 2
   saturation_evidence_threshold: 5
+  max_consecutive_scrolls: 3
+  checkpoint_interval_actions: 10
 
 providers:
-  vision_backend: "stub"
-  ocr_backend: "stub"
-  controller_backend: "stub"
+  vision_backend: "qwen2-vl"
+  vision_model_path: "Qwen/Qwen2-VL-2B-Instruct"
+  ocr_backend: "tesseract"
+  tesseract_cmd: null
+  controller_backend: "windows"
+  hf_token: null
+  openai_api_key: null
+
+android:
+  device_serial: null
+  use_scrcpy: true
+  scrcpy_path: "scrcpy"
+  scrcpy_max_fps: 5
+  scrcpy_bitrate: "2M"
+  adb_path: "adb"
+
+dedup:
+  levenshtein_same_threshold: 0.95
+  levenshtein_prob_same_threshold: 0.80
+  image_hash_distance_threshold: 5

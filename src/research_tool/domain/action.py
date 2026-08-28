@@ -34,6 +34,8 @@ class ActionCommand:
     y: int | None = None
     text: str | None = None
     key: str | None = None
+    dx: int | None = None
+    dy: int | None = None
     reasoning: str = ""
 
 

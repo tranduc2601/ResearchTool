@@ -59,8 +59,9 @@ class VLMBenchmark:
             
         elif self.model_name == "qwen2-vl":
             # Qwen2-VL (2B)
+            from transformers import Qwen2VLForConditionalGeneration
             model_id = "Qwen/Qwen2-VL-2B-Instruct"
-            self.model = AutoModelForCausalLM.from_pretrained(
+            self.model = Qwen2VLForConditionalGeneration.from_pretrained(
                 model_id,
                 trust_remote_code=True,
                 quantization_config=quant_config,
@@ -89,6 +90,7 @@ class VLMBenchmark:
             enc_image = self.model.encode_image(image)
             result = self.model.answer_question(enc_image, prompt, self.tokenizer)
         elif self.model_name == "qwen2-vl":
+            from qwen_vl_utils import process_vision_info
             # Setup chat format for Qwen2-VL
             messages = [
                 {
@@ -100,7 +102,15 @@ class VLMBenchmark:
                 }
             ]
             text = self.processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-            inputs = self.processor(text=[text], images=[image], padding=True, return_tensors="pt").to(self.device)
+            image_inputs, video_inputs = process_vision_info(messages)
+            
+            inputs = self.processor(
+                text=[text],
+                images=image_inputs,
+                videos=video_inputs,
+                padding=True,
+                return_tensors="pt"
+            ).to(self.device)
             
             generated_ids = self.model.generate(**inputs, max_new_tokens=128)
             generated_ids_trimmed = [
