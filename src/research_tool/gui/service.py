@@ -122,8 +122,17 @@ class ApplicationService:
         checkpoint_repo = CheckpointRepo(db_path)
         event_repo = EventRepo(db_path)
         
+        from research_tool.implementations.ocr.paddle_ocr import PaddleOCRProvider, PADDLE_AVAILABLE
+        from research_tool.implementations.ocr.tesseract_ocr import TesseractOCRProvider, TESSERACT_AVAILABLE
+        
         file_storage = FileStorage(self.settings.data_dir)
-        ocr = TesseractOCRProvider()
+        ocr = None
+        
+        if self.settings.providers.ocr_backend.lower() == "paddle" and PADDLE_AVAILABLE:
+            ocr = PaddleOCRProvider()
+        elif self.settings.providers.ocr_backend.lower() == "tesseract" and TESSERACT_AVAILABLE:
+            ocr = TesseractOCRProvider()
+            
         vision = LocalVisionProvider(model_name=model, ocr_provider=ocr)
         
         if platform.lower() == "android":

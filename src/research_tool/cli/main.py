@@ -12,7 +12,6 @@ from research_tool.infrastructure.db.repositories import (
 )
 from research_tool.infrastructure.file_storage import FileStorage
 from research_tool.implementations.vision.local_vlm import LocalVisionProvider
-from research_tool.implementations.ocr.tesseract_ocr import TesseractOCRProvider
 from research_tool.implementations.controller.windows_controller import WindowsController
 from research_tool.implementations.controller.android_controller import AndroidController
 from research_tool.core.scaling_mapper import ScalingCoordinateMapper
@@ -66,8 +65,13 @@ async def _async_run(query: str, config: Path | None, model: str, platform: str,
     # Infrastructure
     file_storage = FileStorage(settings.data_dir)
     
-    # Providers
-    ocr = TesseractOCRProvider()
+    if settings.providers.ocr_backend.lower() == "paddle":
+        from research_tool.implementations.ocr.paddle_ocr import PaddleOCRProvider, PADDLE_AVAILABLE
+        ocr = PaddleOCRProvider() if PADDLE_AVAILABLE else None
+    else:
+        from research_tool.implementations.ocr.tesseract_ocr import TesseractOCRProvider, TESSERACT_AVAILABLE
+        ocr = TesseractOCRProvider() if TESSERACT_AVAILABLE else None
+        
     vision = LocalVisionProvider(model_name=model, ocr_provider=ocr)
     
     if platform.lower() == "android":

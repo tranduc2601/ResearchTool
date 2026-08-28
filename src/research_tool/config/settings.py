@@ -17,7 +17,7 @@ class OrchestratorSettings(BaseModel):
 class ProviderSettings(BaseModel):
     vision_backend: str = "qwen2-vl"
     vision_model_path: str = "Qwen/Qwen2-VL-2B-Instruct"
-    ocr_backend: str = "tesseract"
+    ocr_backend: str = "paddle"
     tesseract_cmd: str | None = None
     controller_backend: str = "windows"
     hf_token: str | None = None

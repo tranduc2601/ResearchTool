@@ -12,7 +12,7 @@ orchestrator:
 providers:
   vision_backend: "qwen2-vl"
   vision_model_path: "Qwen/Qwen2-VL-2B-Instruct"
-  ocr_backend: "tesseract"
+  ocr_backend: "paddle"
   tesseract_cmd: null
   controller_backend: "windows"
   hf_token: null
