@@ -1,178 +1,259 @@
-# Hướng Dẫn Sử Dụng Dành Cho Người Mới Bắt Đầu (Beginner Run Guide)
+# Sổ Tay Hướng Dẫn Sử Dụng (End-to-End User Manual)
 
-Chào mừng bạn đến với **ResearchTool**! Đây là một hệ thống AI tự động hóa (Agent) có khả năng "nhìn" vào màn hình của bạn và tự động di chuyển chuột, gõ phím, hoặc lướt điện thoại Android để tìm kiếm thông tin theo yêu cầu.
+Chào mừng bạn đến với **ResearchTool**. Đây là tài liệu hướng dẫn cực kỳ chi tiết, được viết dành riêng cho người mới bắt đầu (không yêu cầu kiến thức lập trình). 
 
-Tài liệu này được viết dành riêng cho người mới bắt đầu, không yêu cầu kiến thức lập trình trước đó. Hãy đọc kỹ từng bước để hiểu Agent đang làm gì, cách kiểm soát nó, và tránh việc nó click nhầm vào các dữ liệu quan trọng của bạn.
+Tài liệu này sẽ dẫn dắt bạn từ con số 0: từ lúc mở máy, thiết lập công cụ, hiểu cách AI hoạt động, cho đến khi AI có thể tự động lướt web trên máy tính hoặc điện thoại Android của bạn để thu thập dữ liệu.
 
 ---
 
-## 1. Mở PowerShell và Truy Cập Dự Án
+## PHẦN 1 — CÀI ĐẶT LẦN ĐẦU (FIRST-TIME SETUP)
 
-**Bước này làm gì:** Khởi động dòng lệnh (PowerShell) và di chuyển vào thư mục chứa mã nguồn của dự án trên máy tính của bạn.
+### 1. Mở PowerShell và Vào Thư Mục Dự Án
+PowerShell là "Giao diện dòng lệnh" (CLI) của Windows, nơi bạn gõ các dòng chữ để ra lệnh cho máy tính.
+1. Bấm nút **Start** trên Windows, gõ `PowerShell` và nhấn Enter.
+2. Bạn cần di chuyển vào thư mục chứa phần mềm này. Gõ lệnh sau và nhấn Enter:
 
-**Lệnh PowerShell:**
 ```powershell
-# [SAFE / read-only]
+# [SAFE / READ ONLY]
 cd "D:\OneDrive\Máy tính\ResearchTool"
 ```
-* **Kỳ vọng (Thành công):** Dòng lệnh của bạn sẽ đổi thành `PS D:\OneDrive\Máy tính\ResearchTool>`.
-* **Thất bại:** Báo lỗi "Cannot find path". Hãy kiểm tra lại thư mục có thực sự nằm ở ổ D không.
 
----
+### 2. Kích Hoạt Môi Trường Ảo (.venv)
+Môi trường ảo (Virtual Environment) là một chiếc "hộp cách ly", chứa toàn bộ các công cụ cần thiết cho phần mềm này mà không làm ảnh hưởng đến các phần mềm khác trên máy tính của bạn.
 
-## 2. Kích Hoạt Môi Trường Ảo (.venv)
-
-**Bước này làm gì:** Bật môi trường Python cô lập của dự án để sử dụng đúng các thư viện đã được cài đặt riêng cho công cụ này.
-
-**Lệnh PowerShell:**
 ```powershell
-# [SAFE / read-only]
+# [SAFE / READ ONLY]
 .\.venv\Scripts\Activate.ps1
 ```
-* **Kỳ vọng:** Bạn sẽ thấy chữ `(.venv)` xuất hiện ở đầu dòng lệnh màu xanh lá cây.
-* **Thất bại:** Nếu PowerShell báo lỗi "cannot be loaded because running scripts is disabled", hãy chạy lệnh `Set-ExecutionPolicy Unrestricted -Scope CurrentUser` trước, rồi thử lại.
+*(Thành công: Bạn sẽ thấy chữ `(.venv)` màu xanh lá xuất hiện ở đầu dòng lệnh).*
 
----
+### 3. Kiểm Tra Python và Card Đồ Họa (GPU)
+Ứng dụng cần **Python** (ngôn ngữ lập trình) và **CUDA** (công nghệ giúp AI chạy mượt trên Card đồ họa NVIDIA RTX 3050 Ti của bạn).
 
-## 3. Kiểm Tra Python, PyTorch, CUDA và Card Đồ Họa (GPU)
-
-**Bước này làm gì:** Đảm bảo hệ thống AI có thể nhận diện được card màn hình NVIDIA RTX 3050 Ti của bạn để chạy mô hình thị giác (Vision) mà không bị treo máy.
-
-**Lệnh PowerShell:**
+Kiểm tra Python:
 ```powershell
-# [SAFE / read-only]
-python -c "import torch; print('CUDA Hợp lệ:', torch.cuda.is_available()); print('Card Đồ Họa:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'Không tìm thấy')"
+# [SAFE / READ ONLY]
+python --version
 ```
-* **Kỳ vọng:** In ra `CUDA Hợp lệ: True` và `Card Đồ Họa: NVIDIA GeForce RTX 3050 Ti Laptop GPU`.
-* **Thất bại:** In ra `CUDA Hợp lệ: False`. *Dừng lại ngay và báo cáo lỗi*, vì Agent sẽ chạy cực kỳ chậm nếu dùng CPU.
 
----
-
-## 4. Hiểu Cấu Trúc Các Thư Mục Quan Trọng
-
-Trước khi chạy, hãy hiểu các thành phần của ứng dụng (bạn không cần chạy lệnh ở phần này):
-* `src/research_tool/`: Bộ não của Agent (chứa mã nguồn logic, cách Agent "suy nghĩ" và "hành động").
-* `scripts/`: Chứa các bài kiểm tra an toàn (benchmark) để bạn thử nghiệm trước khi chạy thật.
-* `data/`: Nơi Agent lưu trữ *mọi thứ* nó tìm thấy. Gồm:
-  * `research.db`: Cơ sở dữ liệu chính (SQLite) lưu danh sách các nơi đã xem, thông tin lấy được.
-  * `screenshots/`: Thư mục lưu ảnh chụp màn hình mỗi khi Agent click hoặc cuộn.
-* `logs/` (nếu có): Nơi chứa các file ghi chép (nhật ký) để biết Agent bị lỗi ở đâu.
-
----
-
-## 5. Bài Kiểm Tra Đầu Tiên (Cực Kỳ An Toàn)
-
-**Bước này làm gì:** Agent sẽ tải mô hình thị giác (Qwen2-VL) vào Card đồ họa (VRAM) của bạn và nhìn vào một bức ảnh giả (dummy) để tập phân tích. Lệnh này KHÔNG di chuyển chuột, KHÔNG click, và KHÔNG ảnh hưởng gì đến máy bạn.
-
-**Lệnh PowerShell:**
+Kiểm tra Card Đồ Họa (CUDA):
 ```powershell
-# [SAFE / read-only]
+# [SAFE / READ ONLY]
+python -c "import torch; print('CUDA Hợp lệ:', torch.cuda.is_available())"
+```
+*(Thành công: Hệ thống in ra `CUDA Hợp lệ: True`).*
+
+### 4. Kiểm Tra Các Phần Mềm Phụ Trợ (Bên Ngoài)
+* **Tesseract OCR:** Công cụ giúp AI "đọc" các dòng chữ nhỏ li ti trên màn hình.
+* **ADB (Android Debug Bridge):** Công cụ "cầu nối" giúp máy tính gửi lệnh điều khiển tới điện thoại Android qua cáp USB.
+* **scrcpy:** Phần mềm giúp truyền hình ảnh màn hình điện thoại lên máy tính siêu tốc.
+
+```powershell
+# [SAFE / READ ONLY]
+tesseract --version
+adb version
+scrcpy --version
+```
+*(Nếu một trong các lệnh trên báo lỗi màu đỏ "is not recognized", phần mềm đó chưa được cài hoặc chưa được thêm vào Windows PATH. Bạn vẫn có thể chạy trên Windows bình thường, nhưng sẽ không dùng được Android hoặc OCR cho đến khi cài chúng).*
+
+---
+
+## PHẦN 2 — HIỂU CÁC THUẬT NGỮ CỦA ỨNG DỤNG
+
+* **ResearchTool:** Là tên phần mềm này. Khác với ChatGPT (chỉ biết nói chuyện), ResearchTool là một "Đặc vụ" (Agent) có tay và mắt để tự dùng máy tính của bạn tìm thông tin.
+* **VLM (Vision-Language Model):** "Đôi mắt và Bộ não" của AI (ở đây dùng mô hình `Qwen2-VL`). Nó nhìn vào ảnh chụp màn hình và phân tích xem nút bấm đang nằm ở tọa độ nào.
+* **Controller (Người điều khiển):** "Đôi tay" của AI. Giúp AI bấm chuột, gõ phím trên Windows, hoặc vuốt chạm trên Android.
+* **SQLite:** "Sổ ghi chép". Đây là một hệ cơ sở dữ liệu siêu nhẹ được lưu thành 1 file duy nhất (`research.db`). Mọi thứ AI tìm được đều ghi vào đây.
+* **Frontier / Seed:** 
+  * `Seed` (Hạt giống): Từ khóa ban đầu bạn giao cho AI (VD: "Ghế công thái học").
+  * `Frontier` (Tiền tuyến): Khi AI lướt web và thấy thông tin mới (VD: thấy link "Ghế Hòa Phát"), nó sẽ cho link đó vào danh sách `Frontier` để lát nữa tự động truy cập.
+* **Screenshots / Logs / Evidence:** Hình ảnh màn hình, Sổ nhật ký lỗi, và Bằng chứng thông tin cắn rứt được từ web.
+* **CLI / TUI / GUI:**
+  * **CLI:** Dòng lệnh toàn chữ đen trắng.
+  * **TUI (Text User Interface):** Dòng lệnh nhưng có đóng khung màu sắc, thanh tiến trình đẹp mắt.
+  * **GUI (Graphical User Interface):** Cửa sổ phần mềm bình thường có nút bấm chuột (giống Word hay Excel).
+
+---
+
+## PHẦN 3 — CÁC BÀI KIỂM TRA AN TOÀN (SAFE TESTS)
+
+Trước khi cho phép AI cướp chuột của bạn, chúng ta phải thử nghiệm độ an toàn.
+
+**BÍ KÍP DỪNG KHẨN CẤP (FAILSAFE):**
+Nếu AI đang tự di chuyển chuột mà bạn muốn dừng nó ngay lập tức: **Hãy cầm chuột vật lý của bạn và đẩy thật mạnh, hất con trỏ chuột bay về góc trên cùng bên trái màn hình (Tọa độ X:0, Y:0).** Hệ thống (PyAutoGUI) sẽ kích hoạt công tắc ngắt điện khẩn cấp và dừng ngay lập tức!
+Cách thứ 2 là bấm `Ctrl + C` ở cửa sổ PowerShell.
+
+**Bài test 1: Kiểm tra "Mắt" AI (Không đụng chuột)**
+Lệnh này chỉ đọc 1 bức ảnh giả và yêu cầu VLM phân tích xem VRAM có bị đầy không.
+```powershell
+# [SAFE / READ ONLY]
 python scripts\validation\benchmark_stability.py --model qwen2-vl --iters 1
 ```
-* **Kỳ vọng:** Nó sẽ tải các "cục tạ" (weights) của AI từ 0% đến 100%. Sau khoảng 10-20 giây, nó sẽ in ra thời gian phản hồi (Latency) khoảng 6-8 giây và VRAM Usage khoảng ~1.55 GB.
-* **Thất bại:** Báo lỗi "Out of Memory" (Hết VRAM) hoặc văng chương trình. *Nếu lỗi, hãy dừng lại và báo cáo.*
 
----
-
-## 6. Chạy Ứng Dụng Qua Giao Diện Hình Ảnh (Tkinter GUI)
-
-**Bước này làm gì:** Thay vì gõ lệnh dài dòng, bạn có thể dùng một cửa sổ giao diện nhỏ cực kỳ dễ dùng mà tôi đã tạo sẵn.
-
-**Lệnh PowerShell:**
+**Bài test 2: Kiểm tra Đọc Chữ OCR (Không đụng chuột)**
 ```powershell
-# [SAFE / read-only]
-python src\research_tool\gui\app.py
+# [SAFE / READ ONLY]
+python scripts\validation\benchmark_ocr.py
 ```
-* **Kỳ vọng:** Một cửa sổ phần mềm nhỏ tên "Autonomous Research Tool" hiện lên. Bạn có thể nhập mục tiêu (Goal), chọn nền tảng (`windows` hoặc `android`), và chọn mô hình (`qwen2-vl`). Bạn có thể tắt nó đi sau khi xem thử.
 
 ---
 
-## 7. Bài Kiểm Tra Đóng Vòng Trên Windows (Dùng Chuột/Phím Thật)
+## PHẦN 4 — CHẠY THỬ LẦN ĐẦU TRÊN WINDOWS
 
-**Bước này làm gì:** Agent sẽ được trao quyền ĐIỀU KHIỂN CHUỘT VÀ BÀN PHÍM. 
-**LƯU Ý:** Hãy mở một cửa sổ trình duyệt (ví dụ: Google hoặc Shopee) an toàn và để nó toàn màn hình. Thu nhỏ mọi tài liệu cá nhân. *Không chạm vào chuột khi nó đang chạy.*
+Chúng ta sẽ chạy một đoạn kịch bản ngắn để AI thử click chuột.
 
-**Lệnh PowerShell:**
+**Chuẩn bị:** 
+1. Mở một trình duyệt web (Google Chrome hoặc Edge), vào trang chủ Google.
+2. Để trình duyệt phóng to toàn màn hình. Thu nhỏ mọi thứ khác chứa thông tin cá nhân.
+3. Rời tay khỏi chuột.
+
+**Lệnh chạy:**
 ```powershell
-# [MAY MOVE MOUSE] [MAY CLICK/TYPE]
+# [MOVES MOUSE] [CLICKS/TYPES]
 python scripts\run_acceptance.py
 ```
-* **Kỳ vọng:** Chuột của bạn sẽ *tự động* di chuyển. Agent chụp màn hình, phân tích, rồi click vào các nút hoặc thanh tìm kiếm, và có thể cuộn trang (scroll). Sau vài bước, nó sẽ tự báo `GOAL_MET` (Đạt mục tiêu) hoặc `HUMAN_REQUIRED` (Cần con người giúp) và tự dừng lại.
-* **Thất bại:** Agent click lung tung vào các nút nguy hiểm.
-* **CÁCH DỪNG KHẨN CẤP:** Di chuyển chuột thật mạnh về **Góc trên cùng bên trái của màn hình (Tọa độ 0,0)**. Chức năng Failsafe của Windows sẽ lập tức ngắt Agent. Hoặc bấm `Ctrl + C` ở cửa sổ PowerShell.
+
+* **AI sẽ làm gì?** Con trỏ chuột của bạn sẽ tự động bay quanh màn hình. Nó sẽ cố chụp ảnh, tìm nút bấm, và click. 
+* **Thành công:** Sau 1-2 hành động, AI nhận ra đã hoàn thành hoặc hết lệnh và tự thoát.
+* **Thất bại:** Chuột click điên cuồng vào góc màn hình hoặc văng lỗi màu đỏ. (Nhớ dùng tuyệt chiêu hất chuột lên góc trái nếu cần).
 
 ---
 
-## 8. Chuẩn Bị & Kiểm Tra Android (Điện thoại iQOO Z10 Turbo+)
+## PHẦN 5 — ĐIỀU KHIỂN ANDROID BẰNG ĐIỆN THOẠI THẬT
 
-**Bước này làm gì:** Kiểm tra xem máy tính có nhận diện được điện thoại của bạn qua cáp USB không.
+Ứng dụng hỗ trợ cực tốt cho điện thoại thật của bạn (**iQOO Z10 Turbo+**, màn hình 1260x2800). Bạn phải thiết lập điện thoại trước:
 
-**Thao tác chuẩn bị (Không cần PowerShell):**
-1. Cắm cáp USB nối điện thoại với máy tính.
-2. Trên điện thoại, vào Cài đặt -> Tùy chọn nhà phát triển -> Bật **"Gỡ lỗi USB" (USB Debugging)**.
-3. Khi điện thoại hiện bảng hỏi "Cho phép gỡ lỗi USB từ máy tính này?", chọn **Đồng ý / OK**.
+1. **Bật Developer Options (Tùy chọn nhà phát triển):** Vào Cài đặt điện thoại -> Giới thiệu điện thoại -> Bấm 7 lần vào "Số phiên bản" (Build Number).
+2. **Bật USB Debugging (Gỡ lỗi USB):** Quay ra Cài đặt -> Hệ thống -> Tùy chọn nhà phát triển -> Bật "Gỡ lỗi USB" & Bật "Gỡ lỗi USB (Cài đặt bảo mật - cho phép giả lập vuốt/chạm)".
+3. **Kết nối:** Cắm cáp USB nối điện thoại vào laptop. Trên điện thoại sẽ hiện bảng hỏi "Cho phép máy tính này?", hãy bấm **Đồng ý / OK**.
 
-**Lệnh PowerShell kiểm tra:**
+**Kiểm tra kết nối:**
 ```powershell
-# [SAFE / read-only]
+# [SAFE / READ ONLY]
 adb devices
 ```
-* **Kỳ vọng:** Bạn sẽ thấy danh sách thiết bị có 1 dòng chứa mã số thiết bị kèm chữ `device` (VD: `12345abcd device`).
-* **Thất bại:** Hiện chữ `unauthorized` (chưa bấm Đồng ý trên điện thoại) hoặc trống trơn (lỗi cáp/chưa bật gỡ lỗi). *Chỉ đi tiếp khi đã hiện chữ `device`.*
+*(Kỳ vọng: Hiện ra 1 dòng mã số kèm chữ `device`. Nếu hiện `unauthorized`, bạn phải mở khóa màn hình điện thoại và bấm Đồng ý).*
 
----
-
-## 9. Chạy Thử Trên Android (ADB / Scrcpy)
-
-**Bước này làm gì:** Agent sẽ không đụng vào chuột máy tính nữa, mà sẽ "nhìn" vào màn hình điện thoại của bạn và tự động vuốt/chạm trên điện thoại để tìm thông tin.
-
-**Lệnh PowerShell:**
+**Bắt đầu chạy AI trên Android:**
+*(Hãy mở sẵn ứng dụng Shopee hoặc Chrome trên điện thoại).*
 ```powershell
-# [MAY CONTROL ANDROID] [LONG-RUNNING]
-research-tool run "Tìm giá điện thoại rẻ nhất trên màn hình" --platform android
+# [CONTROLS ANDROID] [LONG RUNNING]
+research-tool run "Đọc thông tin giá các sản phẩm trên màn hình" --platform android
 ```
-* **Kỳ vọng:** Màn hình điện thoại của bạn sẽ tự động cuộn (vuốt) hoặc tự động mở các nút bấm. Trên PowerShell (TUI), bạn sẽ thấy Agent đang suy luận.
-* **Cách dừng khẩn cấp:** Bấm `Ctrl + C` trên bàn phím máy tính ở cửa sổ PowerShell. Hoặc đơn giản là rút cáp USB điện thoại ra.
+AI sẽ KHÔNG lấy chuột máy tính của bạn. Nó sẽ chụp màn hình điện thoại qua cáp USB, phân tích, và gửi lệnh vuốt/chạm ngược lại điện thoại. 
 
 ---
 
-## 10. Cách Quản Lý Quá Trình Chạy (CLI & TUI)
+## PHẦN 6 — CHẠY NHIỆM VỤ NGHIÊN CỨU THỰC SỰ
 
-Khi bạn chạy lệnh `research-tool run ...`, màn hình (TUI - Terminal User Interface) sẽ hiện ra một bảng điều khiển động.
-* **Agent đang làm gì?** Bạn sẽ thấy trạng thái: `THINKING` (Đang phân tích ảnh), `ACTING` (Đang click chuột/cuộn trang), hoặc `WAITING` (Chờ tải trang).
-* **Dừng an toàn:** Bấm phím `Ctrl + C` trên bàn phím. Cấu trúc lưu trữ SQLite rất an toàn nên bạn không lo mất dữ liệu giữa chừng.
-* **Khôi phục phiên chạy cũ (Resume):** Khi chạy, Agent tạo ra một mã `RUN_ID` (VD: `01HGF...`). Nếu bạn lỡ tắt máy, hãy chạy lệnh sau để làm tiếp:
+Bây giờ bạn sẽ chạy ứng dụng chính thức để tìm kiếm thực sự trên Windows.
+*Hãy mở sẵn Wikipedia, Amazon hoặc trang bạn muốn trên màn hình Windows.*
+
 ```powershell
-# [MAY MOVE MOUSE]
-research-tool run "tiếp tục việc cũ" --resume "MÃ_RUN_ID_CỦA_BẠN"
+# [MOVES MOUSE] [CLICKS/TYPES] [LONG RUNNING]
+research-tool run "Tìm giá ghế ergonomic quanh mức 2 triệu" --platform windows --model qwen2-vl
 ```
 
+* **Model Selection (`--model`):** Chọn não bộ AI. Mặc định là `qwen2-vl` vì nó chạy cục bộ tốt nhất trên máy bạn.
+* **Platform Selection (`--platform`):** Chọn `windows` (chuột máy tính) hoặc `android` (cáp USB).
+* **Quá trình AI chạy:**
+  1. Chụp màn hình (SEE).
+  2. Gửi ảnh vào não bộ Qwen2-VL để suy nghĩ mất 6-8 giây (THINK).
+  3. Quyết định di chuyển chuột/cuộn trang (ACT).
+  4. Lưu thông tin cắn rứt được vào SQLite.
+  5. Lặp lại cho đến khi tìm đủ thông tin.
+* **HUMAN_REQUIRED:** Nếu AI gặp CAPTCHA hoặc trang bắt đăng nhập, nó sẽ báo `HUMAN_REQUIRED` và dừng lại nhường chuột cho bạn giải quyết.
+
 ---
 
-## 11. Trích Xuất (Export) Kết Quả Để Xem Dữ Liệu
+## PHẦN 7 — DÙNG TUI VÀ GUI (GIAO DIỆN)
 
-**Bước này làm gì:** Lấy toàn bộ thông tin mà Agent thu thập được (Tên sản phẩm, giá cả, cấu hình) và xuất ra file Excel (CSV) để bạn dễ đọc. Lệnh này tuyệt đối an toàn.
+Nếu bạn không thích dòng lệnh khô khan, hãy mở Giao Diện (GUI).
 
-**Lệnh PowerShell:**
 ```powershell
-# [SAFE / read-only]
+# [SAFE / READ ONLY]
+python src\research_tool\gui\app.py
+```
+
+* **Ô Goal/Query:** Nhập mục tiêu (VD: "Tìm giá laptop").
+* **Platform:** Chọn nền tảng (Windows / Android).
+* **Model:** Chọn mô hình.
+* **Start Exploration:** Nút bắt đầu. Vừa bấm xong hãy bỏ tay khỏi chuột ngay nhé!
+* **Log Output:** Khung trắng dưới cùng sẽ hiển thị những gì AI đang làm.
+
+---
+
+## PHẦN 8 — DỪNG / TẠM DỪNG / CHẠY TIẾP
+
+* **Dừng bình thường:** Để AI chạy đến khi đạt mục tiêu (`GOAL_MET`).
+* **Dừng khẩn cấp:** Bấm `Ctrl + C` hoặc hất chuột lên góc trái 0,0.
+* **Checkpoint:** Cứ sau vài lần click, hệ thống tự lưu quá trình làm việc. Nếu tắt máy ngang, dữ liệu KHÔNG bị mất.
+* **Resume (Khôi phục):** Mỗi lần chạy sẽ có một `RUN_ID` hiện ra trên màn hình (VD: `01HQF...`). Để làm tiếp công việc đang dang dở:
+```powershell
+# [MOVES MOUSE] [CLICKS/TYPES] [LONG RUNNING]
+research-tool run "Mục tiêu" --resume "MÃ_RUN_ID_CỦA_BẠN"
+```
+
+---
+
+## PHẦN 9 — ĐẦU RA VÀ XUẤT DỮ LIỆU (OUTPUT)
+
+Dữ liệu của bạn được lưu an toàn trên ổ cứng, không gửi đi đâu cả.
+Cấu trúc thư mục:
+```text
+D:\OneDrive\Máy tính\ResearchTool\
+└── data\
+    ├── research.db          (File SQLite chứa chữ, giá, lịch sử click)
+    └── screenshots\         (Ảnh chụp màn hình AI đã nhìn)
+```
+
+**Cách xuất dữ liệu ra file Excel (.csv):**
+```powershell
+# [SAFE / READ ONLY]
 research-tool export "MÃ_RUN_ID_CỦA_BẠN" --format csv --out "D:\OneDrive\Máy tính\ResearchTool\results"
 ```
-* **Kỳ vọng:** Báo "Exported 4 tables...". Bạn vào thư mục `results` vừa tạo và mở các file `.csv` bằng Excel để xem thành quả.
+Mở thư mục `results`, bạn sẽ thấy các file `entities.csv` (Thực thể/Sản phẩm), `evidence.csv` (Bằng chứng), v.v.
 
 ---
 
-## 12. Trình Tự Chạy Khuyến Nghị Dành Riêng Cho Máy Bạn
-**(Ryzen 5, 3050 Ti 4GB, 16GB RAM, Windows + iQOO Z10)**
+## PHẦN 10 — SỬA LỖI (TROUBLESHOOTING)
 
-Tôi khuyên bạn làm theo đúng thứ tự sau trong lần đầu trải nghiệm:
+| Vấn đề | Ý nghĩa | Cách xử lý |
+| :--- | :--- | :--- |
+| **CUDA unavailable** | Python không thấy Card RTX 3050 Ti. | Cài lại Driver NVIDIA hoặc thư viện PyTorch bản CUDA. |
+| **Model fails to load** | Tải mô hình Qwen2-VL thất bại do lỗi mạng. | Kiểm tra Internet. Chạy lại để nó tải tiếp. |
+| **VRAM OOM** | Tràn bộ nhớ Card đồ họa. | Tắt bớt các ứng dụng game, chrome đang mở nặng. |
+| **PyAutoGUI cannot move**| Chuột bị kẹt ở góc 0,0 do Failsafe. | Di chuyển chuột ra giữa màn hình và chạy lại. |
+| **ADB device unauthorized**| Cắm cáp nhưng chưa cho phép trên đt. | Mở khóa đt, tick vào ô "Luôn cho phép máy tính này". |
+| **CAPTCHA / Login**| Web yêu cầu xác minh con người. | AI sẽ dừng. Bạn tự dùng tay giải CAPTCHA rồi chạy Resume. |
+| **UNKNOWN state / Loops**| AI bị ngáo, cứ cuộn lên cuộn xuống mãi. | Dừng AI (`Ctrl+C`). Thay đổi từ khóa tìm kiếm rõ ràng hơn. |
 
-1. Mở PowerShell, vào thư mục và gõ `.\.venv\Scripts\Activate.ps1`.
-2. Gõ `python scripts\validation\benchmark_stability.py --model qwen2-vl --iters 1` để đo thử VRAM. *Hãy tự tin vì máy bạn có 4GB VRAM, mô hình Qwen2-VL chỉ tốn khoảng 1.55 GB!*
-3. Gõ `python src\research_tool\gui\app.py` để mở giao diện cửa sổ nhỏ. 
-4. Tại giao diện cửa sổ nhỏ (GUI), nhập "Tìm tin tức công nghệ mới", chọn `windows`, và bấm **Start Exploration**.
-5. Bỏ tay ra khỏi chuột và nhìn nó tự hoạt động khoảng 1-2 phút, sau đó bấm `Ctrl + C` ở cửa sổ CMD phía sau để dừng nó lại.
-6. (Tùy chọn) Cắm iQOO Z10 vào, mở khóa màn hình, xác nhận `adb devices` thành công, rồi gõ lệnh ở Bước 9 để xem nó điều khiển điện thoại.
-7. Khi đã quen, bạn có thể treo máy (LONG-RUNNING) qua đêm để Agent tự đi săn dữ liệu! 
+*Khi nào nên dừng và nhờ lập trình viên?* Nếu báo lỗi code màu đỏ dài loằng ngoằng (Traceback Exception) liên tục mà bạn đã thử mọi cách.
 
-**Chúc bạn thành công với Autonomous Visual Information Explorer!**
+---
+
+## PHẦN 11 — QUY TRÌNH CHUẨN: TỪ LÚC MỞ MÁY ĐẾN KHI CÓ KẾT QUẢ
+
+Đây là Checklist chính xác cho công việc thực tế hàng ngày:
+
+1. **Mở máy:** Bật Windows, mở ứng dụng Chrome/Edge.
+2. **Khởi động:** Mở PowerShell. Gõ:
+   ```powershell
+   # [SAFE / READ ONLY]
+   cd "D:\OneDrive\Máy tính\ResearchTool"
+   .\.venv\Scripts\Activate.ps1
+   ```
+3. **Mở sẵn màn hình:** Mở sẵn trang web (VD: shopee.vn) trên Chrome.
+4. **Bắt đầu AI:**
+   ```powershell
+   # [MOVES MOUSE] [CLICKS/TYPES] [LONG RUNNING]
+   research-tool run "So sánh giá bàn phím cơ không dây" --platform windows
+   ```
+5. **Quan sát (Observe):** Bỏ tay khỏi chuột. Ngồi xem AI di chuyển chuột, đọc ảnh, cuộn trang.
+6. **Kết thúc (Stop):** AI in ra `Session completed!`. (Hoặc bạn tự ngắt bằng `Ctrl + C` nếu thấy đủ).
+7. **Lấy thành quả (Collect):**
+   ```powershell
+   # [SAFE / READ ONLY]
+   research-tool export "<COPY_RUN_ID_Ở_MÀN_HÌNH>" --format csv --out ./ket_qua
+   ```
+8. **Kiểm tra:** Vào thư mục `ket_qua`, mở file CSV bằng Excel và đọc bảng dữ liệu thông minh mà AI đã lấy về.
