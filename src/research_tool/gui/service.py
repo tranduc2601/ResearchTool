@@ -1,0 +1,186 @@
+"""Application Service bridging Orchestrator and GUI."""
+import asyncio
+import threading
+import queue
+import time
+from pathlib import Path
+from typing import Optional, Dict, Any
+import ulid
+
+from research_tool.config.settings import load_settings, AppSettings
+from research_tool.infrastructure.db.connection import apply_schema
+from research_tool.infrastructure.db.repositories import (
+    RunRepo, SeedRepo, FrontierRepo, GraphRepo, VisitRepo,
+    EvidenceRepo, EntityRepo, CheckpointRepo, EventRepo
+)
+from research_tool.infrastructure.file_storage import FileStorage
+from research_tool.implementations.vision.local_vlm import LocalVisionProvider
+from research_tool.implementations.ocr.tesseract_ocr import TesseractOCRProvider
+from research_tool.implementations.controller.windows_controller import WindowsController
+from research_tool.implementations.controller.android_controller import AndroidController
+from research_tool.core.scaling_mapper import ScalingCoordinateMapper
+
+from research_tool.core.event_logger import EventLogger
+from research_tool.core.yield_tracker import YieldTracker
+from research_tool.core.seed_manager import SeedManager
+from research_tool.core.visit_manager import VisitManager
+from research_tool.core.frontier_manager import FrontierManager
+from research_tool.core.exploration_graph import ExplorationGraph
+from research_tool.core.evidence_manager import EvidenceManager
+from research_tool.core.recovery_manager import RecoveryManager
+from research_tool.core.entity_manager import EntityManager
+from research_tool.core.orchestrator import Orchestrator
+
+class ApplicationService:
+    def __init__(self):
+        self.orchestrator: Optional[Orchestrator] = None
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self.state_queue = queue.Queue()
+        self.run_id: str = ""
+        self.settings: Optional[AppSettings] = None
+
+    def start_run(self, query: str, platform: str, model: str, time_end_mins: float, out_dir: str, adb_device: str = None, use_scrcpy: bool = False):
+        """Starts the orchestrator in a background thread."""
+        if self._thread and self._thread.is_alive():
+            raise RuntimeError("Already running")
+            
+        self._stop_event.clear()
+        self.run_id = ulid.new().str
+        self.settings = load_settings()
+        
+        # Override output dir if provided
+        if out_dir:
+            self.settings.data_dir = Path(out_dir)
+            
+        self._thread = threading.Thread(
+            target=self._run_loop,
+            args=(query, platform, model, time_end_mins, adb_device, use_scrcpy),
+            daemon=True
+        )
+        self._thread.start()
+
+    def stop_run(self):
+        """Requests the orchestrator to stop safely."""
+        self._stop_event.set()
+        if self.orchestrator and self.orchestrator.current_run:
+            from research_tool.domain.run import RunStatus
+            self.orchestrator.current_run.status = RunStatus.PAUSED
+            
+    def emergency_stop(self):
+        """Triggers emergency stop (hard fail)."""
+        self._stop_event.set()
+        if self.orchestrator and self.orchestrator.current_run:
+            from research_tool.domain.run import RunStatus
+            self.orchestrator.current_run.status = RunStatus.FAILED
+
+    def get_latest_state(self) -> Dict[str, Any]:
+        """Returns the current state for the GUI to display."""
+        if not self.orchestrator or not self.orchestrator.current_run:
+            return {"status": "IDLE"}
+            
+        return {
+            "status": self.orchestrator.current_run.status.value,
+            "run_id": self.run_id,
+            "platform": self.orchestrator.world_state.platform.value if self.orchestrator.world_state.platform else "Unknown",
+            "active_app": self.orchestrator.world_state.active_window_title or "Unknown",
+            "seeds": len(self.orchestrator.seed_manager.seeds),
+            "frontier": len(self.orchestrator.frontier.items),
+            "entities": len(self.orchestrator.entity_manager.entities),
+            "evidence": len(self.orchestrator.evidence.evidence_items),
+        }
+
+    def _run_loop(self, query: str, platform: str, model: str, time_end_mins: float, adb_device: str, use_scrcpy: bool):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        try:
+            self.loop.run_until_complete(self._async_start(query, platform, model, time_end_mins, adb_device, use_scrcpy))
+        except Exception as e:
+            self.state_queue.put({"error": str(e)})
+        finally:
+            self.loop.close()
+
+    async def _async_start(self, query: str, platform: str, model: str, time_end_mins: float, adb_device: str, use_scrcpy: bool):
+        db_path = self.settings.data_dir / "research.db"
+        self.settings.data_dir.mkdir(parents=True, exist_ok=True)
+        await apply_schema(db_path)
+        
+        # Repos
+        run_repo = RunRepo(db_path)
+        seed_repo = SeedRepo(db_path)
+        frontier_repo = FrontierRepo(db_path)
+        graph_repo = GraphRepo(db_path)
+        visit_repo = VisitRepo(db_path)
+        evidence_repo = EvidenceRepo(db_path)
+        entity_repo = EntityRepo(db_path)
+        checkpoint_repo = CheckpointRepo(db_path)
+        event_repo = EventRepo(db_path)
+        
+        file_storage = FileStorage(self.settings.data_dir)
+        ocr = TesseractOCRProvider()
+        vision = LocalVisionProvider(model_name=model, ocr_provider=ocr)
+        
+        if platform.lower() == "android":
+            mapper = ScalingCoordinateMapper(1000, 1000, 1080, 2400)
+            controller = AndroidController(device_serial=adb_device, mapper=mapper, use_scrcpy=use_scrcpy)
+            if use_scrcpy:
+                await controller.start_scrcpy()
+        else:
+            mapper = ScalingCoordinateMapper(1000, 1000, 1920, 1080)
+            controller = WindowsController(mapper=mapper)
+            
+        events = EventLogger(self.run_id, event_repo, file_storage)
+        yield_tracker = YieldTracker()
+        seeds = SeedManager(self.run_id, seed_repo)
+        visits = VisitManager(self.run_id, visit_repo)
+        frontier = FrontierManager(self.run_id, frontier_repo)
+        graph = ExplorationGraph(self.run_id, graph_repo)
+        entities = EntityManager(self.run_id, entity_repo, frontier, yield_tracker)
+        evidence = EvidenceManager(self.run_id, evidence_repo, entity_repo, file_storage, yield_tracker)
+        recovery = RecoveryManager(self.run_id, checkpoint_repo, yield_tracker)
+        
+        self.orchestrator = Orchestrator(
+            settings=self.settings,
+            run_repo=run_repo,
+            controller=controller,
+            vision_provider=vision,
+            ocr_provider=ocr,
+            event_logger=events,
+            yield_tracker=yield_tracker,
+            seed_manager=seeds,
+            visit_manager=visits,
+            frontier_manager=frontier,
+            exploration_graph=graph,
+            evidence_manager=evidence,
+            recovery_manager=recovery,
+            entity_manager=entities
+        )
+        
+        # Override action timeout/limits if time_end_mins is set
+        if time_end_mins > 0:
+            # Simplistic approach: we just let orchestrator run but have a background task watch time
+            pass
+            
+        start_time = time.time()
+        
+        # Create a watchdog task to monitor for stop event or timeout
+        async def watchdog():
+            while not self._stop_event.is_set():
+                if time_end_mins > 0 and (time.time() - start_time) > (time_end_mins * 60):
+                    self.stop_run()
+                    self.state_queue.put({"log": f"Time limit of {time_end_mins} mins reached."})
+                    break
+                await asyncio.sleep(1)
+                
+        watchdog_task = asyncio.create_task(watchdog())
+        
+        try:
+            self.state_queue.put({"log": f"Session started: {self.run_id}"})
+            await self.orchestrator.start_session(query, run_id=self.run_id)
+        except Exception as e:
+            self.state_queue.put({"log": f"Error in orchestrator: {str(e)}"})
+        finally:
+            self._stop_event.set()
+            await watchdog_task
+            self.state_queue.put({"log": "Session ended."})

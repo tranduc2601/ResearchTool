@@ -4,13 +4,14 @@ from pathlib import Path
 
 def build():
     # Base directory
-    base_dir = Path(__file__).parent.absolute()
-    main_script = base_dir / "src" / "research_tool" / "cli" / "main.py"
+    base_dir = Path(__file__).parent.parent.absolute()
+    main_script = base_dir / "research_tool_gui.py"
     
     # Run PyInstaller
     PyInstaller.__main__.run([
         str(main_script),
-        '--name=research-tool',
+        '--name=ResearchTool',
+        '--windowed',
         '--onefile',
         '--clean',
         '--paths=' + str(base_dir / "src"),

@@ -55,10 +55,10 @@ This document provides a complete project status map for the local-first Autonom
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **CLI** | `MOCK_TESTED` | `cli/main.py` | Mock | Yes | No | None. |
 | **TUI** | `MOCK_TESTED` | `cli/dashboard.py` | Mock | Yes | No | Visual spacing and real-time VRAM updates. |
-| **desktop GUI** | `IMPLEMENTED` | `gui/app.py` | Real | No | No | Link to internal event loop instead of CLI pipe. |
+| **desktop GUI** | `IMPLEMENTED` | `gui/app.py`, `gui/service.py` | Real | No | No | Uses ApplicationService to directly control Orchestrator. |
 | **export** | `IMPLEMENTED` | `cli/main.py export` | Real | No | No | Support HTML report generation. |
 | **acceptance test** | `IMPLEMENTED` | `scripts/run_acceptance.py` | Real | No | No | Execute against physical target. |
-| **packaging** | `IMPLEMENTED` | `scripts/build_standalone.py` | Real | No | No | Test PyInstaller binary on clean machine. |
+| **packaging** | `IMPLEMENTED` | `scripts/build_standalone.py` | Real | No | No | Builds ResearchTool.exe with PyInstaller. |
 
 ---
 
