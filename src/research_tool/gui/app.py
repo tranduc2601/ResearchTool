@@ -21,85 +21,85 @@ class ResearchToolGUI:
         
         # --- Config Tab ---
         self.config_frame = ttk.Frame(self.notebook, padding=10)
-        self.notebook.add(self.config_frame, text="Configuration")
+        self.notebook.add(self.config_frame, text="Cài đặt")
         
-        ttk.Label(self.config_frame, text="Goal / Query:").grid(row=0, column=0, sticky="w", pady=5)
+        ttk.Label(self.config_frame, text="Mục tiêu (Goal):").grid(row=0, column=0, sticky="w", pady=5)
         self.query_var = tk.StringVar()
         ttk.Entry(self.config_frame, textvariable=self.query_var, width=60).grid(row=0, column=1, columnspan=2, sticky="w", pady=5)
         
-        ttk.Label(self.config_frame, text="Platform:").grid(row=1, column=0, sticky="w", pady=5)
+        ttk.Label(self.config_frame, text="Nền tảng:").grid(row=1, column=0, sticky="w", pady=5)
         self.platform_var = tk.StringVar(value="windows")
         plat_combo = ttk.Combobox(self.config_frame, textvariable=self.platform_var, values=["windows", "android"], state="readonly", width=15)
         plat_combo.grid(row=1, column=1, sticky="w", pady=5)
         plat_combo.bind("<<ComboboxSelected>>", self._on_platform_change)
         
-        ttk.Label(self.config_frame, text="Vision Model:").grid(row=2, column=0, sticky="w", pady=5)
+        ttk.Label(self.config_frame, text="Mô hình (Model):").grid(row=2, column=0, sticky="w", pady=5)
         self.model_var = tk.StringVar(value="qwen2-vl")
         ttk.Combobox(self.config_frame, textvariable=self.model_var, values=["qwen2-vl", "moondream2"], state="readonly", width=15).grid(row=2, column=1, sticky="w", pady=5)
         
-        ttk.Label(self.config_frame, text="TimeEnd (mins, 0=inf):").grid(row=3, column=0, sticky="w", pady=5)
+        ttk.Label(self.config_frame, text="Thời gian kết thúc (phút, 0=vô hạn):").grid(row=3, column=0, sticky="w", pady=5)
         self.time_var = tk.DoubleVar(value=0.0)
         ttk.Entry(self.config_frame, textvariable=self.time_var, width=10).grid(row=3, column=1, sticky="w", pady=5)
         
-        ttk.Label(self.config_frame, text="Output Directory:").grid(row=4, column=0, sticky="w", pady=5)
+        ttk.Label(self.config_frame, text="Thư mục dữ liệu:").grid(row=4, column=0, sticky="w", pady=5)
         self.out_var = tk.StringVar(value="data")
         ttk.Entry(self.config_frame, textvariable=self.out_var, width=40).grid(row=4, column=1, sticky="w", pady=5)
         
         # Android specific
-        self.android_frame = ttk.LabelFrame(self.config_frame, text="Android Options", padding=5)
+        self.android_frame = ttk.LabelFrame(self.config_frame, text="Tùy chọn Android", padding=5)
         self.android_frame.grid(row=5, column=0, columnspan=3, sticky="we", pady=10)
         
         ttk.Label(self.android_frame, text="ADB Device:").grid(row=0, column=0, sticky="w", pady=2)
         self.adb_var = tk.StringVar()
         self.adb_combo = ttk.Combobox(self.android_frame, textvariable=self.adb_var, state="readonly", width=20)
         self.adb_combo.grid(row=0, column=1, sticky="w", pady=2)
-        ttk.Button(self.android_frame, text="Refresh", command=self._refresh_adb).grid(row=0, column=2, padx=5)
+        ttk.Button(self.android_frame, text="Làm mới (Refresh)", command=self._refresh_adb).grid(row=0, column=2, padx=5)
         
         self.scrcpy_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(self.android_frame, text="Use scrcpy stream", variable=self.scrcpy_var).grid(row=1, column=0, columnspan=2, sticky="w")
+        ttk.Checkbutton(self.android_frame, text="Dùng scrcpy stream", variable=self.scrcpy_var).grid(row=1, column=0, columnspan=2, sticky="w")
         
         # Hide Android frame by default
         self.android_frame.grid_remove()
         
         # --- Dashboard Tab ---
         self.dash_frame = ttk.Frame(self.notebook, padding=10)
-        self.notebook.add(self.dash_frame, text="Dashboard")
+        self.notebook.add(self.dash_frame, text="Bảng điều khiển (Dashboard)")
         
         # Controls
         ctrl_frame = ttk.Frame(self.dash_frame)
         ctrl_frame.pack(fill=tk.X, pady=5)
         
-        self.btn_start = ttk.Button(ctrl_frame, text="START", command=self.start_run)
+        self.btn_start = ttk.Button(ctrl_frame, text="Bắt đầu", command=self.start_run)
         self.btn_start.pack(side=tk.LEFT, padx=5)
-        self.btn_stop = ttk.Button(ctrl_frame, text="STOP", command=self.stop_run, state=tk.DISABLED)
+        self.btn_stop = ttk.Button(ctrl_frame, text="Dừng", command=self.stop_run, state=tk.DISABLED)
         self.btn_stop.pack(side=tk.LEFT, padx=5)
-        self.btn_emg = ttk.Button(ctrl_frame, text="EMERGENCY STOP", command=self.emergency_stop, state=tk.DISABLED)
+        self.btn_emg = ttk.Button(ctrl_frame, text="Dừng khẩn cấp", command=self.emergency_stop, state=tk.DISABLED)
         self.btn_emg.pack(side=tk.LEFT, padx=5)
-        self.btn_export = ttk.Button(ctrl_frame, text="Export CSV", command=self.export_csv)
+        self.btn_export = ttk.Button(ctrl_frame, text="Xuất CSV (Export)", command=self.export_csv)
         self.btn_export.pack(side=tk.RIGHT, padx=5)
         
         # Status
         stat_frame = ttk.Frame(self.dash_frame)
         stat_frame.pack(fill=tk.X, pady=10)
         
-        self.lbl_status = ttk.Label(stat_frame, text="Status: IDLE", font=("Arial", 12, "bold"))
+        self.lbl_status = ttk.Label(stat_frame, text="Trạng thái: CHƯA BẮT ĐẦU", font=("Arial", 12, "bold"))
         self.lbl_status.grid(row=0, column=0, sticky="w", padx=10)
         self.lbl_run = ttk.Label(stat_frame, text="Run ID: N/A")
         self.lbl_run.grid(row=0, column=1, sticky="w", padx=10)
-        self.lbl_app = ttk.Label(stat_frame, text="Active App: N/A")
+        self.lbl_app = ttk.Label(stat_frame, text="Ứng dụng hiện tại: N/A")
         self.lbl_app.grid(row=1, column=0, columnspan=2, sticky="w", padx=10)
         
         # Metrics
         metric_frame = ttk.Frame(self.dash_frame)
         metric_frame.pack(fill=tk.X, pady=10)
         
-        self.lbl_seeds = ttk.Label(metric_frame, text="Seeds: 0")
+        self.lbl_seeds = ttk.Label(metric_frame, text="Seed hiện tại: 0")
         self.lbl_seeds.grid(row=0, column=0, padx=10)
-        self.lbl_frontier = ttk.Label(metric_frame, text="Frontier: 0")
+        self.lbl_frontier = ttk.Label(metric_frame, text="Danh sách khám phá: 0")
         self.lbl_frontier.grid(row=0, column=1, padx=10)
-        self.lbl_entities = ttk.Label(metric_frame, text="Entities: 0")
+        self.lbl_entities = ttk.Label(metric_frame, text="Đối tượng hiện tại: 0")
         self.lbl_entities.grid(row=0, column=2, padx=10)
-        self.lbl_evidence = ttk.Label(metric_frame, text="Evidence: 0")
+        self.lbl_evidence = ttk.Label(metric_frame, text="Bằng chứng: 0")
         self.lbl_evidence.grid(row=0, column=3, padx=10)
         
         # Hardware
@@ -109,6 +109,7 @@ class ResearchToolGUI:
         self.lbl_hw.pack(side=tk.LEFT, padx=10)
         
         # Logs
+        ttk.Label(self.dash_frame, text="Logs:").pack(anchor="w")
         self.log_text = tk.Text(self.dash_frame, height=10, state=tk.DISABLED)
         self.log_text.pack(fill=tk.BOTH, expand=True, pady=5)
         
@@ -143,17 +144,17 @@ class ResearchToolGUI:
     def start_run(self):
         q = self.query_var.get().strip()
         if not q:
-            messagebox.showerror("Error", "Goal cannot be empty.")
+            messagebox.showerror("Lỗi", "Vui lòng nhập Mục tiêu.")
             return
             
         p = self.platform_var.get()
         if p == "windows":
             # WARNING
             res = messagebox.askokcancel(
-                "WARNING: MOUSE CONTROL", 
-                "The Agent will take control of your mouse and keyboard.\n\n"
-                "To EMERGENCY STOP: slam the mouse to the top-left corner (0,0) of your screen.\n\n"
-                "The GUI will minimize when started. Click OK to proceed."
+                "CẢNH BÁO: ĐIỀU KHIỂN CHUỘT", 
+                "Hệ thống sẽ tự động điều khiển chuột và bàn phím của bạn.\n\n"
+                "DỪNG KHẨN CẤP: Hất mạnh con chuột vật lý lên góc trên cùng bên trái (0,0) của màn hình.\n\n"
+                "Giao diện sẽ tự động thu nhỏ. Bấm OK để tiếp tục."
             )
             if not res:
                 return
@@ -176,12 +177,12 @@ class ResearchToolGUI:
 
     def stop_run(self):
         self.service.stop_run()
-        self.log("Requested normal stop...")
+        self.log("Đã gửi lệnh Dừng an toàn...")
         self._reset_buttons()
 
     def emergency_stop(self):
         self.service.emergency_stop()
-        self.log("EMERGENCY STOP TRIGGERED!")
+        self.log("DỪNG KHẨN CẤP ĐÃ KÍCH HOẠT!")
         self._reset_buttons()
 
     def _reset_buttons(self):
@@ -191,14 +192,14 @@ class ResearchToolGUI:
 
     def export_csv(self):
         if not self.service.run_id:
-            messagebox.showerror("Error", "No run ID available to export.")
+            messagebox.showerror("Lỗi", "Chưa có dữ liệu để xuất.")
             return
             
         import sys
         base_dir = Path(__file__).parent.parent.parent.parent
         cli_path = base_dir / "src" / "research_tool" / "cli" / "main.py"
         subprocess.Popen([sys.executable, str(cli_path), "export", self.service.run_id, "--format", "csv"])
-        self.log(f"Exported run {self.service.run_id} to CSV.")
+        self.log(f"Đã xuất dữ liệu của lần chạy {self.service.run_id} ra file CSV.")
 
     def _poll_update(self):
         # Update logs
@@ -212,18 +213,22 @@ class ResearchToolGUI:
                 
         # Update UI state
         state = self.service.get_latest_state()
-        self.lbl_status.config(text=f"Status: {state.get('status', 'IDLE')}")
+        status = state.get('status', 'CHƯA BẮT ĐẦU')
+        if status == 'PAUSED':
+            status = 'TẠM DỪNG (HUMAN INTERVENTION REQUIRED)'
+            
+        self.lbl_status.config(text=f"Trạng thái: {status}")
         self.lbl_run.config(text=f"Run ID: {state.get('run_id', 'N/A')}")
-        self.lbl_app.config(text=f"Active App: {state.get('active_app', 'N/A')}")
+        self.lbl_app.config(text=f"Ứng dụng hiện tại: {state.get('active_app', 'N/A')}")
         
         if state.get('status') in ['DONE', 'FAILED', 'PAUSED'] and self.btn_stop['state'] == tk.NORMAL:
             self._reset_buttons()
             
         if 'seeds' in state:
-            self.lbl_seeds.config(text=f"Seeds: {state['seeds']}")
-            self.lbl_frontier.config(text=f"Frontier: {state['frontier']}")
-            self.lbl_entities.config(text=f"Entities: {state['entities']}")
-            self.lbl_evidence.config(text=f"Evidence: {state['evidence']}")
+            self.lbl_seeds.config(text=f"Seed hiện tại: {state['seeds']}")
+            self.lbl_frontier.config(text=f"Danh sách khám phá: {state['frontier']}")
+            self.lbl_entities.config(text=f"Đối tượng hiện tại: {state['entities']}")
+            self.lbl_evidence.config(text=f"Bằng chứng: {state['evidence']}")
             
         # Hardware
         cpu = psutil.cpu_percent()

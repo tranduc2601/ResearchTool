@@ -1,8 +1,9 @@
 """Configuration models and loader."""
 from pathlib import Path
-from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource
-from pydantic import BaseModel
+import sys
 import yaml
+from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource
+from pydantic import BaseModel, Field, model_validator
 
 class OrchestratorSettings(BaseModel):
     max_revisits: int = 3
@@ -35,6 +36,17 @@ class DedupSettings(BaseModel):
     levenshtein_prob_same_threshold: float = 0.80
     image_hash_distance_threshold: int = 5
 
+
+
+def get_app_root() -> Path:
+    """Return the absolute path to the application root directory."""
+    if getattr(sys, 'frozen', False):
+        # Running as PyInstaller executable
+        return Path(sys.executable).parent.resolve()
+    else:
+        # Running from source (src/research_tool/config/settings.py -> root)
+        return Path(__file__).parent.parent.parent.parent.resolve()
+
 class AppSettings(BaseSettings):
     """
     Main settings. Reads from defaults.yaml first, then overridden
@@ -43,15 +55,22 @@ class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="RT_",
         env_nested_delimiter="__",
-        env_file=".env",
+        env_file=str(get_app_root() / ".env"),
         extra="ignore"
     )
 
-    data_dir: Path = Path("data")
+    data_dir: Path = Field(default_factory=lambda: get_app_root() / "data")
     orchestrator: OrchestratorSettings = OrchestratorSettings()
     providers: ProviderSettings = ProviderSettings()
     android: AndroidSettings = AndroidSettings()
     dedup: DedupSettings = DedupSettings()
+
+    @model_validator(mode="after")
+    def resolve_paths(self) -> "AppSettings":
+        """Ensure paths are absolute relative to app root."""
+        if not self.data_dir.is_absolute():
+            self.data_dir = get_app_root() / self.data_dir
+        return self
 
     @classmethod
     def settings_customise_sources(
@@ -71,6 +90,8 @@ class AppSettings(BaseSettings):
 
 def load_settings(config_file: Path | str | None = None) -> AppSettings:
     """Load settings from defaults.yaml and env vars."""
+    import logging
+    
     base_kwargs = {}
     default_path = Path(__file__).parent / "defaults.yaml"
     
@@ -80,4 +101,11 @@ def load_settings(config_file: Path | str | None = None) -> AppSettings:
         with open(path_to_load, "r", encoding="utf-8") as f:
             base_kwargs = yaml.safe_load(f) or {}
 
-    return AppSettings(**base_kwargs)
+    settings = AppSettings(**base_kwargs)
+    
+    # Startup self-check
+    logging.info(f"App Root: {get_app_root()}")
+    logging.info(f"Resolved Data Dir: {settings.data_dir}")
+    logging.info(f"Env file path: {get_app_root() / '.env'}")
+    
+    return settings

@@ -48,11 +48,16 @@ class ApplicationService:
             
         self._stop_event.clear()
         self.run_id = ulid.new().str
+        
+        from research_tool.config.settings import get_app_root
         self.settings = load_settings()
         
         # Override output dir if provided
         if out_dir:
-            self.settings.data_dir = Path(out_dir)
+            p = Path(out_dir)
+            if not p.is_absolute():
+                p = get_app_root() / p
+            self.settings.data_dir = p
             
         self._thread = threading.Thread(
             target=self._run_loop,
