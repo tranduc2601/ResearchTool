@@ -107,7 +107,7 @@ class LocalVisionProvider(VisionProvider):
                 return_tensors="pt"
             ).to(self.device)
             
-            generated_ids = self.model.generate(**inputs, max_new_tokens=256)
+            generated_ids = self.model.generate(**inputs, max_new_tokens=1024)
             generated_ids_trimmed = [
                 out_ids[len(in_ids):] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
             ]
@@ -139,6 +139,7 @@ class LocalVisionProvider(VisionProvider):
 
     async def analyze_screen(self, screenshot: bytes, context: WorldState, query: str = "") -> VisionResult:
         image = Image.open(io.BytesIO(screenshot)).convert("RGB")
+        img_w, img_h = image.size
         
         # If we have OCR enabled, we can optionally overlay text or append OCR context to the prompt
         ocr_text = ""
@@ -148,7 +149,7 @@ class LocalVisionProvider(VisionProvider):
             if ocr_result and ocr_result.words:
                 ocr_text = "\nDetected Text via OCR:\n" + ", ".join([w.text for w in ocr_result.words[:20]])
         
-        prompt = VisionPromptBuilder.build_analysis_prompt(context, query)
+        prompt = VisionPromptBuilder.build_analysis_prompt(context, query, img_w, img_h)
         prompt += ocr_text
 
         raw_output = await self._run_inference(image, prompt)
@@ -174,10 +175,38 @@ class LocalVisionProvider(VisionProvider):
         except KeyError:
             action_type = ActionType.WAIT
 
+        box_str = act_dict.get("box_2d")
+        cx, cy = None, None
+        if box_str:
+            import re
+            m = re.search(r'<\|box_start\|>\((\d+),(\d+)\),\((\d+),(\d+)\)<\|box_end\|>', box_str)
+            if m:
+                y1, x1, y2, x2 = map(int, m.groups())
+                cx = (x1 + x2) // 2
+                cy = (y1 + y2) // 2
+            else:
+                # Fallback for generic coordinate array [y1, x1, y2, x2] or just (x, y)
+                nums = re.findall(r'\d+', box_str)
+                if len(nums) >= 4:
+                    y1, x1, y2, x2 = map(int, nums[:4])
+                    cx = (x1 + x2) // 2
+                    cy = (y1 + y2) // 2
+                elif len(nums) == 2:
+                    # Model output a single point, likely (x, y) or (y, x) but let's assume (x, y) as it's common hallucination
+                    # Or maybe (y, x) because Qwen uses y,x? If the prompt says "y1,x1", it might output (y, x). 
+                    # We'll just assume (x, y) if it's standard hallucination, but to be robust, let's look at the string format.
+                    cx, cy = map(int, nums)
+        
+        # Fallback if x, y was directly provided (just in case model disobeys and outputs x,y)
+        if cx is None and act_dict.get("x") is not None:
+            cx = act_dict.get("x")
+        if cy is None and act_dict.get("y") is not None:
+            cy = act_dict.get("y")
+
         command = ActionCommand(
             action_type=action_type,
-            x=act_dict.get("x"),
-            y=act_dict.get("y"),
+            x=cx,
+            y=cy,
             text=act_dict.get("text"),
             dx=act_dict.get("dx"),
             dy=act_dict.get("dy"),

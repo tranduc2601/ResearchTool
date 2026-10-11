@@ -23,6 +23,7 @@ dependencies = [
     "ulid-py>=1.1",
     "pyyaml>=6.0",
     "pyautogui>=0.9.54",
+    "pyperclip>=1.8.2",
     "mss>=9.0",
     "pygetwindow>=0.0.9",
     "Levenshtein>=0.25",

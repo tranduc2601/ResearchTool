@@ -97,23 +97,43 @@ class AndroidController(ComputerController):
             return b""
         return stdout
 
-    async def click(self, x: int, y: int) -> ActionResult:
-        """Tap at the given coordinates."""
-        target_x, target_y = self._map_coordinates(x, y)
-        code, _, stderr = await self._run_adb("shell", "input", "tap", str(target_x), str(target_y))
-        if code == 0:
-            return ActionResult(ActionStatus.SUCCESS, f"Tapped ({target_x}, {target_y})")
-        return ActionResult(ActionStatus.FAILURE, f"ADB tap failed: {stderr.decode('utf-8', errors='ignore')}")
+    async def move(self, x: int, y: int, smooth: bool = True) -> ActionResult:
+        # ADB doesn't natively support "hover/move" without pressing. For touch screens, move without pressing doesn't exist.
+        # But we must implement the interface.
+        return ActionResult(ActionStatus.SUCCESS, "Ignored: Move not applicable on Android touch screen")
 
-    async def type_text(self, text: str) -> ActionResult:
-        """Type the given text."""
-        # ADB input text requires escaping spaces and special characters. 
-        # For simplicity in PoC, replace spaces with %s
-        escaped_text = text.replace(" ", "%s")
-        code, _, stderr = await self._run_adb("shell", "input", "text", escaped_text)
-        if code == 0:
-            return ActionResult(ActionStatus.SUCCESS, f"Typed '{text}'")
-        return ActionResult(ActionStatus.FAILURE, f"ADB text failed: {stderr.decode('utf-8', errors='ignore')}")
+    async def click(self, x: int, y: int, button: str = "left") -> ActionResult:
+        # Button is ignored on Android (it's all touch)
+        target_x, target_y = self._map_coordinates(x, y)
+        code, out, err = await self._run_adb("shell", "input", "tap", str(target_x), str(target_y))
+        if code != 0:
+            return ActionResult(ActionStatus.FAILURE, f"ADB tap failed: {err.decode('utf-8', 'ignore')}")
+        return ActionResult(ActionStatus.SUCCESS, f"Tapped at ({target_x}, {target_y})")
+
+    async def double_click(self, x: int, y: int) -> ActionResult:
+        # Two fast taps
+        target_x, target_y = self._map_coordinates(x, y)
+        code1, _, err1 = await self._run_adb("shell", "input", "tap", str(target_x), str(target_y))
+        code2, _, err2 = await self._run_adb("shell", "input", "tap", str(target_x), str(target_y))
+        if code1 != 0 or code2 != 0:
+            return ActionResult(ActionStatus.FAILURE, f"ADB double tap failed: {err1.decode('utf-8', 'ignore')}")
+        return ActionResult(ActionStatus.SUCCESS, f"Double-tapped at ({target_x}, {target_y})")
+
+    async def type_text(self, text: str, clear_first: bool = False) -> ActionResult:
+        # Input text via ADB. Needs escaping or encoding for spaces/special chars.
+        # A robust way is passing via base64, but simpler for now:
+        if clear_first:
+            # Send KEYCODE_MOVE_END (123) and lots of KEYCODE_DEL (67)
+            # Simplistic approach: 50 deletes
+            await self._run_adb("shell", "input", "keyevent", "123")
+            for _ in range(25):
+                await self._run_adb("shell", "input", "keyevent", "67")
+                
+        escaped_text = text.replace(" ", "%s").replace('"', '\\"')
+        code, out, err = await self._run_adb("shell", "input", "text", f'"{escaped_text}"')
+        if code != 0:
+            return ActionResult(ActionStatus.FAILURE, f"ADB type failed: {err.decode('utf-8', 'ignore')}")
+        return ActionResult(ActionStatus.SUCCESS, f"Typed '{text}'")
 
     async def scroll(self, x: int, y: int, dy: int) -> ActionResult:
         """Swipe to simulate scrolling."""

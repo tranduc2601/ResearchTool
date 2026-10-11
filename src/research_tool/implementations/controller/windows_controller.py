@@ -59,23 +59,56 @@ class WindowsController(ComputerController):
         img.save(buf, format="PNG")
         return buf.getvalue()
 
-    async def click(self, x: int, y: int) -> ActionResult:
+    async def move(self, x: int, y: int, smooth: bool = True) -> ActionResult:
+        """Move the mouse pointer to the given coordinates."""
+        try:
+            target_x, target_y = self._map_coordinates(x, y)
+            duration = 0.2 if smooth else 0.0
+            await asyncio.to_thread(pyautogui.moveTo, target_x, target_y, duration)
+            return ActionResult(ActionStatus.SUCCESS, f"Moved to ({target_x}, {target_y})")
+        except pyautogui.FailSafeException:
+            return ActionResult(ActionStatus.BLOCKED, "Failsafe triggered during move")
+        except Exception as e:
+            logger.exception("windows_move_failed")
+            return ActionResult(ActionStatus.FAILURE, str(e))
+
+    async def click(self, x: int, y: int, button: str = "left") -> ActionResult:
         """Click at the given coordinates."""
         try:
             target_x, target_y = self._map_coordinates(x, y)
-            # Run blocking pyautogui in a thread to avoid blocking asyncio loop
-            await asyncio.to_thread(pyautogui.click, x=target_x, y=target_y)
-            return ActionResult(ActionStatus.SUCCESS, f"Clicked at ({target_x}, {target_y})")
+            await asyncio.to_thread(pyautogui.click, x=target_x, y=target_y, button=button)
+            return ActionResult(ActionStatus.SUCCESS, f"Clicked {button} at ({target_x}, {target_y})")
         except pyautogui.FailSafeException:
             return ActionResult(ActionStatus.BLOCKED, "Failsafe triggered during click")
         except Exception as e:
             logger.exception("windows_click_failed")
             return ActionResult(ActionStatus.FAILURE, str(e))
 
-    async def type_text(self, text: str) -> ActionResult:
+    async def double_click(self, x: int, y: int) -> ActionResult:
+        """Double-click at the given coordinates."""
+        try:
+            target_x, target_y = self._map_coordinates(x, y)
+            await asyncio.to_thread(pyautogui.doubleClick, x=target_x, y=target_y)
+            return ActionResult(ActionStatus.SUCCESS, f"Double-clicked at ({target_x}, {target_y})")
+        except pyautogui.FailSafeException:
+            return ActionResult(ActionStatus.BLOCKED, "Failsafe triggered during double_click")
+        except Exception as e:
+            logger.exception("windows_double_click_failed")
+            return ActionResult(ActionStatus.FAILURE, str(e))
+
+    async def type_text(self, text: str, clear_first: bool = False) -> ActionResult:
         """Type the given text."""
         try:
-            await asyncio.to_thread(pyautogui.write, text, interval=0.01)
+            if clear_first:
+                # ctrl+a then backspace to clear
+                await asyncio.to_thread(pyautogui.hotkey, 'ctrl', 'a')
+                await asyncio.to_thread(pyautogui.press, 'backspace')
+            
+            # Use pyperclip to support Unicode (like Vietnamese) safely on Windows
+            import pyperclip
+            pyperclip.copy(text)
+            await asyncio.to_thread(pyautogui.hotkey, 'ctrl', 'v')
+            
             return ActionResult(ActionStatus.SUCCESS, f"Typed '{text}'")
         except Exception as e:
             logger.exception("windows_type_failed")

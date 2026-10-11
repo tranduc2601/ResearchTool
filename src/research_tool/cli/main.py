@@ -72,13 +72,22 @@ async def _async_run(query: str, config: Path | None, model: str, platform: str,
         from research_tool.implementations.ocr.tesseract_ocr import TesseractOCRProvider, TESSERACT_AVAILABLE
         ocr = TesseractOCRProvider() if TESSERACT_AVAILABLE else None
         
-    vision = LocalVisionProvider(model_name=model, ocr_provider=ocr)
+    hf_model_path = model
+    if model.lower() == "qwen2-vl":
+        hf_model_path = settings.providers.vision_model_path if getattr(settings.providers, 'vision_model_path', None) else "Qwen/Qwen2-VL-2B-Instruct"
+    elif model.lower() == "moondream2":
+        hf_model_path = "vikhyatk/moondream2"
+        
+    vision = LocalVisionProvider(model_name=hf_model_path, ocr_provider=ocr)
     
     if platform.lower() == "android":
+        # Android defaults (could be fetched dynamically, but stub for now)
         mapper = ScalingCoordinateMapper(1000, 1000, 1080, 2400)
-        controller = AndroidController(mapper=mapper)
+        controller = AndroidController(device_serial=None, mapper=mapper)
     else:
-        mapper = ScalingCoordinateMapper(1000, 1000, 1920, 1080)
+        import pyautogui
+        sw, sh = pyautogui.size()
+        mapper = ScalingCoordinateMapper(1000, 1000, sw, sh)
         controller = WindowsController(mapper=mapper)
     
     import ulid

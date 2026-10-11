@@ -246,9 +246,33 @@ class ResearchToolGUI:
         
         self.root.after(1000, self._poll_update)
 
+import re
+ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
+class TextRedirector:
+    def __init__(self, widget, tag="stdout"):
+        self.widget = widget
+        self.tag = tag
+
+    def write(self, str_data):
+        self.widget.after(0, self._insert, str_data)
+
+    def _insert(self, str_data):
+        clean_str = ANSI_ESCAPE.sub('', str_data)
+        self.widget.config(state=tk.NORMAL)
+        self.widget.insert(tk.END, clean_str)
+        self.widget.see(tk.END)
+        self.widget.config(state=tk.DISABLED)
+
+    def flush(self):
+        pass
+
 def launch_gui():
     root = tk.Tk()
     app = ResearchToolGUI(root)
+    import sys
+    sys.stdout = TextRedirector(app.log_text, "stdout")
+    sys.stderr = TextRedirector(app.log_text, "stderr")
     root.mainloop()
 
 if __name__ == "__main__":

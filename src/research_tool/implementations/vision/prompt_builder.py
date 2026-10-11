@@ -4,7 +4,7 @@ from research_tool.domain import WorldState
 
 class VisionPromptBuilder:
     @staticmethod
-    def build_analysis_prompt(state: WorldState, goal: str) -> str:
+    def build_analysis_prompt(state: WorldState, goal: str, screen_width: int = 1920, screen_height: int = 1080) -> str:
         """
         Build a prompt forcing the model to output a strictly formatted JSON.
         We provide the current state and the goal.
@@ -15,6 +15,8 @@ CURRENT CONTEXT:
 Goal: "{goal}"
 Active App: {state.app or 'Unknown'}
 Platform: {state.platform}
+Screen Resolution: {screen_width}x{screen_height}
+Recent Actions Taken: {', '.join(state.navigation_history[-3:]) if state.navigation_history else 'None'}
 
 YOUR TASK:
 Analyze the provided screenshot. You must decide the single next best action to progress toward the goal.
@@ -27,9 +29,8 @@ SCHEMA:
     "confidence": "string (KNOWN | UNCERTAIN | UNKNOWN)",
     "next_action": {{
         "action_type": "string (CLICK | TYPE_TEXT | SCROLL | DRAG | PRESS_KEY | BACK | WAIT | GOAL_MET | GOAL_FAILED | HUMAN_REQUIRED | RECOVER | CONTINUE)",
-        "x": "integer or null (required for CLICK, DRAG, SCROLL)",
-        "y": "integer or null (required for CLICK, DRAG, SCROLL)",
-        "text": "string or null (required for TYPE_TEXT, PRESS_KEY, HOTKEY)",
+        "box_2d": "string or null (For CLICK, SCROLL, DRAG. Output exactly in format <|box_start|>(y1,x1),(y2,x2)<|box_end|> using normalized 1-1000 coordinates)",
+        "text": "string or null (required for TYPE_TEXT, PRESS_KEY)",
         "dx": "integer or null (for DRAG)",
         "dy": "integer or null (for DRAG, SCROLL)"
     }},
@@ -49,9 +50,11 @@ SCHEMA:
 }}
 
 RULES:
-1. If you need to click something, provide its exact center X, Y coordinates based on the image size.
-2. If scrolling, use action_type="SCROLL" and provide x,y (where to place mouse) and dy (amount to scroll, e.g. -1 for down).
+1. If you need to click something, you MUST output its bounding box in `box_2d` using EXACTLY `<|box_start|>(y1,x1),(y2,x2)<|box_end|>` format, where coordinates are scaled 1-1000. DO NOT guess pixel coordinates.
+2. If scrolling, use action_type="SCROLL" and provide `box_2d` (where to place mouse) and dy (amount to scroll, e.g. -1 for down).
 3. If the goal is met and all information has been recorded, use "GOAL_MET".
-4. If a CAPTCHA or blocking popup appears that you cannot handle, use "HUMAN_REQUIRED".
-5. Do NOT include any text outside the JSON object.
+4. If a CAPTCHA or popup blocks you, use "HUMAN_REQUIRED".
+5. AVOID REPETITION: Look at 'Recent Actions Taken'. If your planned action is identical to a recent action and the screen hasn't changed, DO NOT repeat it! Choose a different action, scroll down, or click somewhere else.
+6. If you need to search the web but see no browser, use action_type="PRESS_KEY" with text="win" (to open start menu), then you can use TYPE_TEXT to search for "edge" or "chrome".
+7. Do NOT include any text outside the JSON object.
 """

@@ -38,7 +38,7 @@ class EntityManager:
         
         # 1. Fetch all entities (or a subset) for dedup. 
         # In V1 we fetch all for this run.
-        existing_entities = await self._repo.list_all(self.run_id)
+        existing_entities = await self._repo.list_by_run(self.run_id)
         
         best_match = None
         best_result = DedupResult.DIFFERENT

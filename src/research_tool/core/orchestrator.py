@@ -153,7 +153,7 @@ class Orchestrator:
 
     async def _run_loop(self) -> None:
         """The core outer exploration loop."""
-        max_goals = 5  # Limit for testing
+        max_goals = 1000  # High limit for production
         goals_processed = 0
         
         while goals_processed < max_goals:
@@ -191,7 +191,7 @@ class Orchestrator:
         from research_tool.core.action_validator import ActionValidator
         from research_tool.domain.evidence import EvidenceType
         
-        max_actions = 15
+        max_actions = 50
         actions_taken = 0
         consecutive_scrolls = 0
         validator = ActionValidator(screen_width=1920, screen_height=1080)
@@ -281,7 +281,14 @@ class Orchestrator:
                 raise HumanInterventionRequired("Human required")
                 
             # 5. ACT
-            logger.info("executing_action", type=action.action_type)
+            logger.info("executing_action", type=action.action_type, x=action.x, y=action.y, text=action.text)
+            action_desc = f"{action.action_type.value}"
+            if action.x is not None and action.y is not None:
+                action_desc += f" at ({action.x}, {action.y})"
+            if action.text:
+                action_desc += f" text='{action.text}'"
+            self.world_state.navigation_history.append(action_desc)
+            
             result = None
             if action.action_type == ActionType.CLICK and action.x is not None and action.y is not None:
                 result = await self.controller.click(action.x, action.y)

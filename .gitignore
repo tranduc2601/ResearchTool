@@ -56,3 +56,5 @@ coverage.xml
 data/
 *.sqlite3
 .superpowers/sdd/
+
+.codegraph/

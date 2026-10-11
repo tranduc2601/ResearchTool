@@ -85,15 +85,28 @@ class ApplicationService:
         if not self.orchestrator or not self.orchestrator.current_run:
             return {"status": "IDLE"}
             
+        seeds = frontier = entities = evidence = 0
+        try:
+            import sqlite3
+            db_path = self.settings.data_dir / "research.db"
+            with sqlite3.connect(db_path) as conn:
+                c = conn.cursor()
+                seeds = c.execute("SELECT COUNT(*) FROM seeds WHERE run_id=?", (self.run_id,)).fetchone()[0]
+                frontier = c.execute("SELECT COUNT(*) FROM frontier WHERE run_id=?", (self.run_id,)).fetchone()[0]
+                entities = c.execute("SELECT COUNT(*) FROM entities WHERE run_id=?", (self.run_id,)).fetchone()[0]
+                evidence = c.execute("SELECT COUNT(*) FROM evidence WHERE run_id=?", (self.run_id,)).fetchone()[0]
+        except Exception:
+            pass
+            
         return {
             "status": self.orchestrator.current_run.status.value,
             "run_id": self.run_id,
-            "platform": self.orchestrator.world_state.platform.value if self.orchestrator.world_state.platform else "Unknown",
-            "active_app": self.orchestrator.world_state.active_window_title or "Unknown",
-            "seeds": len(self.orchestrator.seed_manager.seeds),
-            "frontier": len(self.orchestrator.frontier.items),
-            "entities": len(self.orchestrator.entity_manager.entities),
-            "evidence": len(self.orchestrator.evidence.evidence_items),
+            "platform": self.orchestrator.world_state.platform if self.orchestrator.world_state.platform else "Unknown",
+            "active_app": self.orchestrator.world_state.app or "Unknown",
+            "seeds": seeds,
+            "frontier": frontier,
+            "entities": entities,
+            "evidence": evidence,
         }
 
     def _run_loop(self, query: str, platform: str, model: str, time_end_mins: float, adb_device: str, use_scrcpy: bool):
@@ -133,15 +146,26 @@ class ApplicationService:
         elif self.settings.providers.ocr_backend.lower() == "tesseract" and TESSERACT_AVAILABLE:
             ocr = TesseractOCRProvider()
             
-        vision = LocalVisionProvider(model_name=model, ocr_provider=ocr)
+        # Map friendly names to HuggingFace repository paths
+        hf_model_path = model
+        if model.lower() == "qwen2-vl":
+            hf_model_path = self.settings.providers.vision_model_path if getattr(self.settings.providers, 'vision_model_path', None) else "Qwen/Qwen2-VL-2B-Instruct"
+        elif model.lower() == "moondream2":
+            hf_model_path = "vikhyatk/moondream2"
+            
+        vision = LocalVisionProvider(model_name=hf_model_path, ocr_provider=ocr)
         
         if platform.lower() == "android":
+            # Scale from Qwen's native 1000x1000 grid to Android screen size
             mapper = ScalingCoordinateMapper(1000, 1000, 1080, 2400)
             controller = AndroidController(device_serial=adb_device, mapper=mapper, use_scrcpy=use_scrcpy)
             if use_scrcpy:
                 await controller.start_scrcpy()
         else:
-            mapper = ScalingCoordinateMapper(1000, 1000, 1920, 1080)
+            # Scale from Qwen's native 1000x1000 grid to actual screen size
+            import pyautogui
+            sw, sh = pyautogui.size()
+            mapper = ScalingCoordinateMapper(1000, 1000, sw, sh)
             controller = WindowsController(mapper=mapper)
             
         events = EventLogger(self.run_id, event_repo, file_storage)
